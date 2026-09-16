@@ -1,0 +1,83 @@
+# docker-compose.yml do SyncGate
+#
+# Como usar:
+#   Coloque este arquivo em uma pasta, com "syncgate-backend" e
+#   "syncgate-frontend" como subpastas dela (os dois projetos que
+#   você já tem). Depois, na pasta onde está este arquivo, rode:
+#     docker compose up -d --build
+#
+# Isso sobe 3 serviços: banco de dados, API e painel — todos
+# conversando entre si automaticamente.
+
+services:
+  # ------------------------------------------------------------
+  # Banco de dados MySQL/MariaDB
+  # ------------------------------------------------------------
+  mysql:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: syncgate
+      MYSQL_USER: syncgate_app
+      MYSQL_PASSWORD: syncgate123
+    ports:
+      - "3307:3306"
+    volumes:
+      # Guarda os dados do banco fora do container, para não perder
+      # tudo se o container for recriado.
+      - syncgate_mysql_data:/var/lib/mysql
+      # Na primeira vez que o banco sobe (container vazio), o
+      # MariaDB executa automaticamente qualquer .sql encontrado
+      # aqui — é assim que as tabelas são criadas sem você precisar
+      # rodar "mysql -u root < schema.sql" manualmente.
+      - ./syncgate-backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ------------------------------------------------------------
+  # API (backend)
+  # ------------------------------------------------------------
+  backend:
+    build:
+      context: ./syncgate-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: syncgate_app
+      DB_PASSWORD: syncgate123
+      DB_NAME: syncgate
+      # Troque por um valor seu antes de usar isso de verdade.
+      JWT_SECRET: troque_esta_chave_por_algo_seguro
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ------------------------------------------------------------
+  # Painel (frontend)
+  # ------------------------------------------------------------
+  frontend:
+    build:
+      context: ./syncgate-frontend
+      args:
+        # Essa URL precisa ser alcançável pelo NAVEGADOR de quem
+        # usa o painel (não pelo container) — por isso é
+        # "localhost:3000" e não "backend:3000".
+        VITE_API_URL: http://localhost:3000/api
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  syncgate_mysql_data:

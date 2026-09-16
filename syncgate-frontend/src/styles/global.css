@@ -1,0 +1,209 @@
+/* ============================================================
+   SyncGate — Tokens de design
+   Paleta baseada na identidade visual da marca (azul-marinho +
+   azul de destaque), tipografia técnica (Space Grotesk + Inter),
+   pensado como um console de segurança: estado sempre comunicado
+   por cor + texto/ícone, nunca só por cor.
+   ============================================================ */
+
+:root {
+  /* Cores de marca */
+  --cor-navy-900: #0b1e3d;
+  --cor-navy-800: #122a52;
+  --cor-blue-600: #1554f5;
+  --cor-blue-50: #eef3ff;
+
+  /* Neutros */
+  --cor-fundo: #f6f8fb;
+  --cor-superficie: #ffffff;
+  --cor-borda: #e2e8f0;
+  --cor-texto: #0f172a;
+  --cor-texto-suave: #5b6577;
+
+  /* Estados */
+  --cor-sucesso: #16a34a;
+  --cor-sucesso-fundo: #eafaf0;
+  --cor-perigo: #dc2626;
+  --cor-perigo-fundo: #fdecec;
+  --cor-alerta: #d97706;
+  --cor-alerta-fundo: #fdf3e3;
+
+  /* Tipografia */
+  --fonte-display: "Space Grotesk", sans-serif;
+  --fonte-texto: "Inter", sans-serif;
+  --fonte-mono: "JetBrains Mono", monospace;
+
+  /* Espaçamento e forma */
+  --raio: 10px;
+  --raio-pequeno: 6px;
+  --sombra: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--fonte-texto);
+  color: var(--cor-texto);
+  background: var(--cor-fundo);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--fonte-display);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select {
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+a {
+  color: inherit;
+}
+
+/* Respeita quem prefere menos animação */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+::selection {
+  background: var(--cor-blue-50);
+  color: var(--cor-navy-900);
+}
+
+/* ============================================================
+   Responsividade
+   Abaixo de 820px: o menu lateral vira um painel deslizante
+   (drawer) em vez de ficar sempre fixo ocupando espaço, e a
+   tela de login empilha em vez de dividir em duas colunas.
+   ============================================================ */
+
+.sg-sidebar {
+  transition: transform 0.2s ease;
+}
+
+.sg-sidebar-backdrop {
+  display: none;
+}
+
+.sg-botao-menu {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .sg-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    transform: translateX(-100%);
+  }
+
+  .sg-sidebar.aberto {
+    transform: translateX(0);
+  }
+
+  .sg-sidebar-backdrop.aberto {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 30, 61, 0.45);
+    z-index: 30;
+  }
+
+  .sg-botao-menu {
+    display: flex;
+  }
+
+  .sg-conteudo {
+    padding: 1.1rem !important;
+  }
+
+  .sg-login-pagina {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sg-login-marca {
+    display: none;
+  }
+
+  /* Tabelas: em telas pequenas, cada linha vira um cartão
+     empilhado (rótulo + valor) em vez de colunas espremidas
+     exigindo rolagem horizontal. */
+  .sg-tabela-responsiva thead {
+    display: none;
+  }
+
+  .sg-tabela-responsiva,
+  .sg-tabela-responsiva tbody,
+  .sg-tabela-responsiva tr,
+  .sg-tabela-responsiva td {
+    display: block;
+    width: 100%;
+  }
+
+  .sg-tabela-responsiva tr {
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.9rem;
+  }
+
+  .sg-tabela-responsiva td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0 !important;
+    border-bottom: 1px solid var(--cor-borda) !important;
+    text-align: right;
+  }
+
+  .sg-tabela-responsiva td:last-child {
+    border-bottom: none !important;
+  }
+
+  .sg-tabela-responsiva td::before {
+    content: attr(data-rotulo);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--cor-texto-suave);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  /* Células sem rótulo (ex.: coluna só com botões de ação) ficam
+     alinhadas à direita, sem o rótulo em maiúsculas antes. */
+  .sg-tabela-responsiva td:not([data-rotulo]) {
+    justify-content: flex-end;
+  }
+}
+
