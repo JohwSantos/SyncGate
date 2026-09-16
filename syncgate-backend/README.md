@@ -1,78 +1,52 @@
 # SyncGate — Backend
 
-API REST do sistema de controle de acesso **SyncGate** (ETEC Zona Leste), desenvolvida em Node.js + Express, seguindo o padrão MVC (Rotas → Controllers → Services → Models → Banco de dados).
+API REST do sistema de controle de acesso **SyncGate**, desenvolvida em Node.js + Express, seguindo o padrão MVC (Rotas → Controllers → Services → Models → Banco de dados). Projeto de TCC da ETEC Zona Leste (Centro Paula Souza).
 
-> **Status atual:** fundação do backend + banco de dados + CRUD de `usuarios` e `cartoes` funcionando de ponta a ponta. Ainda faltam: `dispositivos`, o registro/validação de `acesso`, `horarios_acesso`, `solicitacao_acesso`, autenticação, painel React e o firmware do ESP32.
+> **Status:** completo. As 6 entidades do sistema, autenticação, tempo real e exclusão com integridade referencial estão implementadas e testadas.
 
 ---
 
 ## Tecnologias
 
-- Node.js + Express
+- Node.js + Express (arquitetura MVC)
 - MySQL / MariaDB (via `mysql2`)
-- `bcryptjs` (hash de senha)
-- `dotenv`, `cors`
-- Arquitetura MVC
+- JWT (`jsonwebtoken`) — autenticação das rotas administrativas
+- Socket.io — eventos em tempo real
+- `bcryptjs` — hash de senha
+- Docker (Dockerfile incluso)
 
 ## Estrutura do projeto
 
 ```
 syncgate-backend/
 ├── database/
-│   └── schema.sql            # Script de criação das 6 tabelas
+│   └── schema.sql              # As 6 tabelas, chaves estrangeiras e índices
+├── scripts/
+│   └── criarAdmin.js            # Bootstrap do primeiro administrador (sem passar pela API)
 ├── src/
-│   ├── config/
-│   │   ├── env.js             # Leitura das variáveis de ambiente
-│   │   └── database.js        # Pool de conexão MySQL
-│   ├── controllers/
-│   │   ├── usuario.controller.js
-│   │   └── cartao.controller.js
-│   ├── models/
-│   │   ├── usuario.model.js
-│   │   └── cartao.model.js
-│   ├── routes/
-│   │   ├── index.js           # Agrega todas as rotas
-│   │   ├── health.routes.js
-│   │   ├── usuario.routes.js
-│   │   └── cartao.routes.js
-│   ├── services/
-│   │   ├── usuario.service.js # Regras de negócio de usuários
-│   │   └── cartao.service.js  # Regras de negócio de cartões
+│   ├── config/                  # Variáveis de ambiente e conexão MySQL
+│   ├── controllers/             # usuario, cartao, dispositivo, acesso, horarioAcesso, solicitacaoAcesso, auth
+│   ├── models/                  # Um model por entidade — só leem/escrevem no banco
+│   ├── services/                # Regras de negócio (RN01-RN08, RF01-RF10)
+│   ├── routes/                  # Endpoints da API
 │   ├── middlewares/
-│   │   └── errorHandler.js    # Tratamento central de erros
-│   └── app.js                  # Configuração do Express
-├── server.js                    # Ponto de entrada
-├── .env.example
-└── package.json
+│   │   ├── errorHandler.js      # Tratamento central de erros
+│   │   └── auth.middleware.js   # Validação do token JWT
+│   ├── websocket/socket.js      # Eventos em tempo real (Socket.io)
+│   └── app.js
+├── server.js
+├── Dockerfile
+└── .env.example
 ```
 
----
-
-## Instalação e configuração
+## Instalação
 
 ```bash
 npm install
 cp .env.example .env
 ```
 
-Edite o `.env` com os dados do seu MySQL:
-
-```env
-PORT=3000
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=syncgate
-```
-
-> Se o `root` do seu MySQL/MariaDB usar autenticação por socket (comum em instalações locais no Linux), crie um usuário próprio para a aplicação:
-> ```sql
-> CREATE USER 'syncgate_app'@'localhost' IDENTIFIED BY 'uma_senha';
-> GRANT ALL PRIVILEGES ON syncgate.* TO 'syncgate_app'@'localhost';
-> ```
-
-Crie o banco e as tabelas:
+Edite o `.env` com os dados do seu MySQL e defina um `JWT_SECRET` próprio. Crie o banco:
 
 ```bash
 mysql -u root < database/schema.sql
@@ -84,192 +58,77 @@ Suba o servidor:
 npm run dev
 ```
 
-Servidor disponível em `http://localhost:3000`.
+API disponível em `http://localhost:3000/api`.
+
+### Rodando com Docker
+
+Veja o `README-DOCKER.md` na raiz do monorepo — sobe banco, API e painel juntos com `docker compose up -d --build`.
+
+### Criar o primeiro administrador
+
+Como toda rota de cadastro exige login, o primeiro usuário precisa ser criado por script:
+
+```bash
+npm run seed:admin -- "Seu Nome" "12345678900" "admin" "suaSenha123"
+```
 
 ---
 
-## O que já foi construído
+## Entidades e regras de negócio
 
-### 1. Estrutura e configuração do backend
-Servidor Express funcional, com separação em camadas (config, routes, controllers, services, models, middlewares).
-
-### 2. Banco de dados
-Schema completo (`database/schema.sql`) com as 6 entidades do sistema (`usuarios`, `cartoes`, `dispositivos`, `acesso`, `horarios_acesso`, `solicitacao_acesso`), chaves estrangeiras e índices. Testado com `INSERT`s reais, incluindo os casos de CPF duplicado e acesso negado por UID desconhecido.
-
-### 3. Módulo de Usuários (CRUD completo)
-- Cadastro com validação de campos obrigatórios e senha transformada em hash (nunca salva em texto puro)
-- CPF único (retorna `409` em caso de duplicidade)
-- Listagem e busca por id (nunca expõe `senha_hash`)
-- Atualização de dados
-- Bloqueio/desbloqueio sem exclusão do cadastro (RF09)
-
-### 4. Módulo de Cartões RFID (CRUD parcial)
-- Vinculação de cartão a um usuário existente (RF08)
-- UID único (retorna `409` em caso de duplicidade)
-- Listagem geral e por usuário
-- Ativação/desativação de cartão sem apagar o registro
-
-### Regras de negócio já implementadas
-| Regra | Onde |
+| Entidade | Descrição |
 |---|---|
-| RN02 — cartão pertence a um único usuário | Estrutura da tabela `cartoes` |
-| RN05 — UID único | Constraint do banco + validação no service (`409`) |
-| CPF único | Constraint do banco + validação no service (`409`) |
-| RF07 — cadastro de usuários | `usuario.service.js` |
-| RF08 — vínculo de cartão | `cartao.service.js` |
-| RF09 — bloqueio sem exclusão | `definirStatus` (usuários) / `definirAtivo` (cartões) |
+| `usuarios` | Alunos, professores, funcionários e admins (herança single-table) |
+| `cartoes` | Cartões RFID, um vinculado a cada usuário |
+| `dispositivos` | Catracas/leitores físicos |
+| `acesso` | Log imutável de cada tentativa de entrada/saída |
+| `horarios_acesso` | Restrição de acesso por dia/horário |
+| `solicitacao_acesso` | Fluxo de aprovação para visitantes |
 
----
+| Regra | Onde é aplicada |
+|---|---|
+| RN02 — um cartão por usuário | Estrutura da tabela `cartoes` |
+| RN03 — toda tentativa é registrada, mesmo negada | `acesso.service.js` |
+| RN04 — usuário bloqueado não acessa | `acesso.service.js` |
+| RN05 — UID e CPF únicos | Constraint do banco + validação no service (`409`) |
+| RN06 — restrição por horário | `horarioAcesso.model.js` + `acesso.service.js` |
+| RN08 — log de acesso imutável | Nenhuma rota de UPDATE/DELETE em `acesso` |
+| RF09 — bloqueio sem exclusão | `definirStatus` / `definirAtivo` |
 
-## Referência da API e como testar
+## Autenticação
 
-Para todos os exemplos abaixo, o servidor precisa estar rodando (`npm run dev`).
+Todas as rotas administrativas exigem `Authorization: Bearer <token>`, obtido em `POST /api/auth/login`. A única rota pública além do login é `POST /api/acesso/validar` — é a rota que o dispositivo físico (ESP32) chama, não uma pessoa logada no painel.
 
-### Health check
+## Exclusão (DELETE)
+
+`usuarios`, `cartoes` e `dispositivos` podem ser excluídos definitivamente. Cartões sempre podem; usuários e dispositivos só quando não têm histórico/vínculos dependentes — nesse caso a API responde `409` com uma mensagem explicando o motivo, em vez de deixar vazar o erro do MySQL.
+
+## Referência rápida dos endpoints
+
+| Método | Rota | Autenticação |
+|---|---|---|
+| GET | `/api/health` | — |
+| POST | `/api/auth/login` | — |
+| POST | `/api/acesso/validar` | — (rota do dispositivo) |
+| GET/POST/PUT/PATCH/DELETE | `/api/usuarios` | Bearer |
+| GET/POST/PATCH/DELETE | `/api/cartoes` | Bearer |
+| GET/POST/PUT/PATCH/DELETE | `/api/dispositivos` | Bearer |
+| GET/POST/DELETE | `/api/horarios` | Bearer |
+| GET/POST/PATCH | `/api/solicitacoes` | Bearer |
+| GET | `/api/acesso` | Bearer |
+
+## WebSocket
+
+Conexão em `http://localhost:3000`, autenticada via `socket.handshake.auth.token` (mesmo JWT do login). Eventos emitidos: `novo-acesso`, `dispositivo-atualizado`, `solicitacao-atualizada`.
+
+## Como testar
+
+Um roteiro completo de testes (com `curl` e Thunder Client) foi seguido etapa a etapa durante o desenvolvimento — cobrindo cada regra de negócio, cenários de erro (`400`/`404`/`409`) e a integração com WebSocket. Para testar rapidamente:
 
 ```bash
 curl http://localhost:3000/api/health
-```
-**Esperado:** `status: "ok"` e `banco_de_dados: "conectado"` (ou `"indisponível"` se o MySQL não estiver acessível).
 
----
-
-### Usuários
-
-**Criar usuário**
-```bash
-curl -X POST http://localhost:3000/api/usuarios \
+curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"nome":"Ana Costa","cpf":"44444444444","tipo":"aluno","login":"ana","senha":"123456"}'
+  -d '{"login":"admin","senha":"suaSenha123"}'
 ```
-**Esperado:** `201`, dados do usuário sem a senha.
-
-**Listar todos**
-```bash
-curl http://localhost:3000/api/usuarios
-```
-
-**Buscar por id**
-```bash
-curl http://localhost:3000/api/usuarios/1
-```
-
-**Atualizar**
-```bash
-curl -X PUT http://localhost:3000/api/usuarios/1 \
-  -H "Content-Type: application/json" \
-  -d '{"nome":"Ana Costa Silva","cargo":"Aluna","perfil":null}'
-```
-
-**Bloquear / desbloquear (RF09)**
-```bash
-curl -X PATCH http://localhost:3000/api/usuarios/1/status \
-  -H "Content-Type: application/json" -d '{"ativo": false}'
-```
-
-**Testar CPF duplicado (deve dar 409)**
-```bash
-curl -w "\n%{http_code}\n" -X POST http://localhost:3000/api/usuarios \
-  -H "Content-Type: application/json" \
-  -d '{"nome":"Outra Pessoa","cpf":"44444444444","tipo":"aluno","login":"outra","senha":"123456"}'
-```
-
-**Testar campo obrigatório faltando (deve dar 400)**
-```bash
-curl -w "\n%{http_code}\n" -X POST http://localhost:3000/api/usuarios \
-  -H "Content-Type: application/json" -d '{"nome":"Sem CPF"}'
-```
-
-**Testar usuário inexistente (deve dar 404)**
-```bash
-curl -w "\n%{http_code}\n" http://localhost:3000/api/usuarios/9999
-```
-
----
-
-### Cartões RFID
-
-**Vincular cartão a um usuário (RF08)** — troque `1` pelo id de um usuário já cadastrado
-```bash
-curl -X POST http://localhost:3000/api/cartoes \
-  -H "Content-Type: application/json" \
-  -d '{"uid":"RFID-TESTE-001","id_usuario":1,"data_emissao":"2026-01-10","data_validade":"2027-01-10"}'
-```
-**Esperado:** `201`, dados do cartão criado.
-
-**Listar todos os cartões**
-```bash
-curl http://localhost:3000/api/cartoes
-```
-
-**Listar cartões de um usuário**
-```bash
-curl http://localhost:3000/api/cartoes/usuario/1
-```
-
-**Buscar cartão por id**
-```bash
-curl http://localhost:3000/api/cartoes/1
-```
-
-**Ativar / desativar cartão**
-```bash
-curl -X PATCH http://localhost:3000/api/cartoes/1/status \
-  -H "Content-Type: application/json" -d '{"ativo": false}'
-```
-
-**Testar UID duplicado (deve dar 409)**
-```bash
-curl -w "\n%{http_code}\n" -X POST http://localhost:3000/api/cartoes \
-  -H "Content-Type: application/json" \
-  -d '{"uid":"RFID-TESTE-001","id_usuario":1}'
-```
-
-**Testar usuário inexistente ao vincular (deve dar 404)**
-```bash
-curl -w "\n%{http_code}\n" -X POST http://localhost:3000/api/cartoes \
-  -H "Content-Type: application/json" -d '{"uid":"RFID-999","id_usuario":9999}'
-```
-
-**Testar campo obrigatório faltando (deve dar 400)**
-```bash
-curl -w "\n%{http_code}\n" -X POST http://localhost:3000/api/cartoes \
-  -H "Content-Type: application/json" -d '{"id_usuario":1}'
-```
-
----
-
-## Tabela-resumo de todos os testes possíveis até agora
-
-| # | O que testa | Resultado esperado |
-|---|---|---|
-| 1 | `GET /api/health` | `200`, status do banco |
-| 2 | Criar usuário válido | `201` |
-| 3 | Listar usuários | `200`, sem `senha_hash` |
-| 4 | Buscar usuário por id | `200` |
-| 5 | Atualizar usuário | `200`, campos alterados |
-| 6 | Bloquear/desbloquear usuário | `200`, `status` muda, registro continua existindo |
-| 7 | Cadastrar usuário com CPF repetido | `409` |
-| 8 | Cadastrar usuário sem campo obrigatório | `400` |
-| 9 | Buscar usuário inexistente | `404` |
-| 10 | Vincular cartão a usuário existente | `201` |
-| 11 | Listar todos os cartões | `200` |
-| 12 | Listar cartões de um usuário | `200` |
-| 13 | Ativar/desativar cartão | `200`, `ativo` muda |
-| 14 | Vincular cartão com UID repetido | `409` |
-| 15 | Vincular cartão a usuário inexistente | `404` |
-| 16 | Vincular cartão sem campo obrigatório | `400` |
-
----
-
-## Próximas etapas (roadmap)
-
-1. **`dispositivos`** — cadastro das catracas/leitores
-2. **`acesso`** — validação e registro de tentativas de entrada/saída (RF03–RF06)
-3. `horarios_acesso` — restrição de acesso por horário (RN06)
-4. `solicitacao_acesso` — fluxo de visitantes
-5. Autenticação (login do painel)
-6. WebSocket (eventos em tempo real)
-7. Painel administrativo em React
-8. Testes automatizados, segurança e documentação final
-9. Firmware do ESP32 e integração física

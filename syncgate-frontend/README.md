@@ -2,26 +2,42 @@
 
 Painel web em React (Vite) para o sistema de controle de acesso SyncGate.
 
-> **Status atual:** estrutura do projeto + identidade visual + tela de login funcional. As demais telas (dashboard, CRUDs, histórico) vêm nas próximas etapas.
+> **Status:** completo. As 7 telas de gestão estão funcionais, com atualização em tempo real e layout responsivo.
 
 ## Tecnologias
 
 - React + Vite
-- React Router (navegação)
+- React Router
 - Context API (estado de login)
-- CSS puro com variáveis de design (tokens em `src/styles/global.css`)
+- Socket.io Client (eventos em tempo real)
+- `lucide-react` (ícones)
+- CSS com variáveis de design (`src/styles/global.css`)
+- Nginx (build de produção via Docker)
 
 ## Estrutura
 
 ```
 src/
-├── api/client.js           # Cliente HTTP autenticado (fala com o backend)
-├── context/AuthContext.jsx # Estado global de login
-├── routes/RotaPrivada.jsx  # Protege telas que exigem login
-├── pages/Login.jsx         # Tela de login
-├── styles/global.css       # Tokens de design (cores, tipografia)
-├── App.jsx                 # Rotas da aplicação
-└── main.jsx                # Ponto de entrada
+├── api/client.js            # Cliente HTTP autenticado
+├── context/AuthContext.jsx  # Estado global de login (token + usuário em localStorage)
+├── hooks/useSocket.js        # Conexão WebSocket reutilizável
+├── routes/RotaPrivada.jsx    # Protege todo o painel atrás de um único guard
+├── components/
+│   ├── Layout.jsx             # Menu lateral + topo + área de conteúdo
+│   ├── Sidebar.jsx             # Navegação (vira menu retrátil no mobile)
+│   ├── Modal.jsx / Badge.jsx / CartaoEstatistica.jsx
+├── pages/
+│   ├── Login.jsx
+│   ├── Dashboard.jsx           # Indicadores + feed de acessos ao vivo
+│   ├── Usuarios.jsx
+│   ├── Cartoes.jsx
+│   ├── Dispositivos.jsx
+│   ├── Horarios.jsx
+│   ├── Solicitacoes.jsx        # Aprovar/rejeitar com atualização em tempo real
+│   └── Historico.jsx           # Log de acessos com filtros
+├── styles/global.css           # Tokens de design + regras responsivas
+├── App.jsx                      # Rotas da aplicação
+└── main.jsx
 ```
 
 ## Instalação e execução
@@ -31,9 +47,7 @@ npm install
 cp .env.example .env
 ```
 
-Confirme que `VITE_API_URL` no `.env` aponta para o backend (por padrão, `http://localhost:3000/api`).
-
-**Importante:** o backend do SyncGate precisa estar rodando, com pelo menos um usuário administrador criado (veja o `README.md` do backend, seção de bootstrap do admin).
+Confirme `VITE_API_URL` no `.env` (padrão: `http://localhost:3000/api`). O backend precisa estar rodando, com pelo menos um administrador criado (`npm run seed:admin` no backend).
 
 ```bash
 npm run dev
@@ -41,20 +55,36 @@ npm run dev
 
 Acesse `http://localhost:5173`.
 
+### Rodando com Docker
+
+Veja o `README-DOCKER.md` na raiz do monorepo.
+
+## Telas
+
+| Tela | O que faz |
+|---|---|
+| Login | Autenticação, token salvo no navegador |
+| Dashboard | Indicadores do dia + feed de acessos ao vivo (WebSocket) |
+| Usuários | Cadastro, edição, bloqueio, exclusão |
+| Cartões RFID | Vínculo com usuário, ativar/desativar, exclusão |
+| Dispositivos | Cadastro, mudança de status, exclusão |
+| Horários de Acesso | Regras de restrição por dia/horário |
+| Solicitações | Aprovar/rejeitar visitantes, sincronizado entre abas via WebSocket |
+| Histórico de Acessos | Log completo com filtros (usuário, dispositivo, status, período) |
+
+## Identidade visual
+
+Paleta baseada na logo (azul-marinho `#0B1E3D` + azul `#1554F5`), tipografia Space Grotesk (títulos) + Inter (texto) + JetBrains Mono (IDs, UIDs, horários) — pensado como um console de segurança, onde estado (permitido/negado, online/offline) é sempre comunicado por cor **e** texto.
+
+## Responsividade
+
+Abaixo de 820px: o menu lateral vira um painel deslizante (ícone de hambúrguer), a tela de login empilha em uma coluna só, e as tabelas passam de colunas com rolagem horizontal para cartões empilhados (rótulo + valor por linha).
+
 ## Como testar
 
-1. Suba o backend (`npm run dev` na pasta do backend) e confirme que existe um admin cadastrado
-2. Suba o frontend (`npm run dev` aqui)
-3. Acesse `http://localhost:5173/login`
-4. Teste com credenciais **erradas** → deve aparecer uma faixa de erro vermelha, sem recarregar a página
-5. Teste com credenciais **corretas** → deve redirecionar para `/`, mostrando "Login realizado com sucesso" (tela temporária — o dashboard real é a próxima etapa)
-6. Recarregue a página em `/` → deve continuar logado (o token fica salvo no navegador)
+```bash
+npm run build   # confirma que compila sem erros
+npm run dev
+```
 
-## Próximas etapas
-
-1. Layout do painel (menu lateral + área de conteúdo) + dashboard com eventos ao vivo via WebSocket
-2. CRUD de usuários
-3. CRUD de cartões e dispositivos
-4. Solicitações de visitantes
-5. Histórico de acessos com filtros
-6. Responsividade e polimento visual
+Fluxo básico: logar → Dashboard mostra indicadores reais → abrir duas abas logadas e aprovar uma solicitação numa delas → a outra atualiza sozinha, sem F5.
