@@ -1,19 +1,21 @@
 const express = require('express');
 const dispositivoController = require('../controllers/dispositivo.controller');
+const permitirPerfil = require('../middlewares/permissao.middleware');
 
 const router = express.Router();
 
-// GET   /api/dispositivos          -> lista todos
-// GET   /api/dispositivos/:id      -> busca um dispositivo
-// POST  /api/dispositivos          -> cadastra um dispositivo
-// PUT   /api/dispositivos/:id      -> atualiza descricao/localizacao/ip
-// PATCH /api/dispositivos/:id/status -> muda status (online/offline/manutencao)
+// GET   /api/dispositivos          -> lista todos (qualquer perfil autenticado)
+// GET   /api/dispositivos/:id      -> busca um dispositivo (qualquer perfil autenticado)
+// POST  /api/dispositivos          -> cadastra (master)
+// PUT   /api/dispositivos/:id      -> atualiza (master)
+// PATCH /api/dispositivos/:id/status -> muda status (master)
+// DELETE /api/dispositivos/:id      -> exclui (master)
 
 router.get('/', dispositivoController.listar);
 router.get('/:id', dispositivoController.buscarPorId);
-router.post('/', dispositivoController.criar);
-router.put('/:id', dispositivoController.atualizar);
-router.patch('/:id/status', dispositivoController.atualizarStatus);
-router.delete('/:id', dispositivoController.remover);
+router.post('/', permitirPerfil('master'), dispositivoController.criar);
+router.put('/:id', permitirPerfil('master'), dispositivoController.atualizar);
+router.patch('/:id/status', permitirPerfil('master'), dispositivoController.atualizarStatus);
+router.delete('/:id', permitirPerfil('master'), dispositivoController.remover);
 
 module.exports = router;
