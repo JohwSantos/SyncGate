@@ -4,11 +4,13 @@ import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
 import { useSocket } from '../hooks/useSocket';
+import { usePermissoes } from '../hooks/usePermissoes';
 
 const TOM_STATUS = { pendente: 'alerta', aprovado: 'sucesso', rejeitado: 'perigo' };
 const ROTULO_STATUS = { pendente: 'Pendente', aprovado: 'Aprovado', rejeitado: 'Rejeitado' };
 
 export default function Solicitacoes() {
+  const { podeAprovarSolicitacoes } = usePermissoes();
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -112,7 +114,7 @@ export default function Solicitacoes() {
                     />
                   </td>
                   <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
-                    {solicitacao.status === 'pendente' && (
+                    {solicitacao.status === 'pendente' && podeAprovarSolicitacoes && (
                       <>
                         <button
                           style={{ ...estilos.botaoIcone, color: 'var(--cor-sucesso)' }}

@@ -3,8 +3,10 @@ import { Plus, Lock, Unlock, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
+import { usePermissoes } from '../hooks/usePermissoes';
 
 export default function Cartoes() {
+  const { podeGerenciarCartoesDispositivos } = usePermissoes();
   const [cartoes, setCartoes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -71,9 +73,11 @@ export default function Cartoes() {
     <div style={estilos.pagina}>
       <div style={estilos.cabecalho}>
         <h1 style={estilos.titulo}>Cartões RFID</h1>
-        <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
-          <Plus size={16} /> Vincular cartão
-        </button>
+        {podeGerenciarCartoesDispositivos && (
+          <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
+            <Plus size={16} /> Vincular cartão
+          </button>
+        )}
       </div>
 
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
@@ -89,7 +93,7 @@ export default function Cartoes() {
                 <th style={estilos.th}>Usuário</th>
                 <th style={estilos.th}>Validade</th>
                 <th style={estilos.th}>Status</th>
-                <th style={estilos.th}></th>
+                {podeGerenciarCartoesDispositivos && <th style={estilos.th}></th>}
               </tr>
             </thead>
             <tbody>
@@ -108,28 +112,30 @@ export default function Cartoes() {
                       tom={cartao.ativo ? 'sucesso' : 'perigo'}
                     />
                   </td>
-                  <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
-                    <button
-                      style={estilos.botaoIcone}
-                      title={cartao.ativo ? 'Desativar' : 'Ativar'}
-                      onClick={() => alternarAtivo(cartao)}
-                    >
-                      {cartao.ativo ? <Lock size={16} /> : <Unlock size={16} />}
-                    </button>
-                    <button
-                      style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                      title="Excluir"
-                      onClick={() => excluirCartao(cartao)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+                  {podeGerenciarCartoesDispositivos && (
+                    <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
+                      <button
+                        style={estilos.botaoIcone}
+                        title={cartao.ativo ? 'Desativar' : 'Ativar'}
+                        onClick={() => alternarAtivo(cartao)}
+                      >
+                        {cartao.ativo ? <Lock size={16} /> : <Unlock size={16} />}
+                      </button>
+                      <button
+                        style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
+                        title="Excluir"
+                        onClick={() => excluirCartao(cartao)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
 
               {cartoes.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
+                  <td colSpan={podeGerenciarCartoesDispositivos ? 5 : 4} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
                     Nenhum cartão vinculado ainda.
                   </td>
                 </tr>

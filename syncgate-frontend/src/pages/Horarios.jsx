@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
+import { usePermissoes } from '../hooks/usePermissoes';
 
 const DIAS = [
   { valor: 'seg', rotulo: 'Segunda-feira' },
@@ -18,6 +19,7 @@ function rotuloDia(valor) {
 }
 
 export default function Horarios() {
+  const { podeGerenciarHorarios } = usePermissoes();
   const [horarios, setHorarios] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [dispositivos, setDispositivos] = useState([]);
@@ -71,9 +73,11 @@ export default function Horarios() {
     <div style={estilos.pagina}>
       <div style={estilos.cabecalho}>
         <h1 style={estilos.titulo}>Horários de Acesso</h1>
-        <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
-          <Plus size={16} /> Nova regra
-        </button>
+        {podeGerenciarHorarios && (
+          <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
+            <Plus size={16} /> Nova regra
+          </button>
+        )}
       </div>
 
       <div style={estilos.aviso}>
@@ -93,7 +97,7 @@ export default function Horarios() {
                 <th style={estilos.th}>Dispositivo</th>
                 <th style={estilos.th}>Dia da semana</th>
                 <th style={estilos.th}>Horário permitido</th>
-                <th style={estilos.th}></th>
+                {podeGerenciarHorarios && <th style={estilos.th}></th>}
               </tr>
             </thead>
             <tbody>
@@ -105,21 +109,23 @@ export default function Horarios() {
                   <td style={{ ...estilos.td, fontFamily: 'var(--fonte-mono)' }} data-rotulo="Horário">
                     {horario.hora_inicio.slice(0, 5)} – {horario.hora_fim.slice(0, 5)}
                   </td>
-                  <td style={estilos.td}>
-                    <button
-                      style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                      title="Remover regra"
-                      onClick={() => remover(horario)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+                  {podeGerenciarHorarios && (
+                    <td style={estilos.td}>
+                      <button
+                        style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
+                        title="Remover regra"
+                        onClick={() => remover(horario)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
 
               {horarios.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
+                  <td colSpan={podeGerenciarHorarios ? 5 : 4} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
                     Nenhuma regra de horário cadastrada — todos os usuários acessam livremente.
                   </td>
                 </tr>

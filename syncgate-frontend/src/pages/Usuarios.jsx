@@ -3,11 +3,13 @@ import { Plus, Pencil, Lock, Unlock, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
+import { usePermissoes } from '../hooks/usePermissoes';
 
 const TIPOS = ['aluno', 'professor', 'funcionario', 'admin'];
 const PERFIS = ['operador', 'gestor', 'master'];
 
 export default function Usuarios() {
+  const { podeGerenciarUsuarios } = usePermissoes();
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
@@ -72,9 +74,11 @@ export default function Usuarios() {
     <div style={estilos.pagina}>
       <div style={estilos.cabecalho}>
         <h1 style={estilos.titulo}>Usuários</h1>
-        <button style={estilos.botaoPrimario} onClick={() => setUsuarioEmEdicao({})}>
-          <Plus size={16} /> Novo usuário
-        </button>
+        {podeGerenciarUsuarios && (
+          <button style={estilos.botaoPrimario} onClick={() => setUsuarioEmEdicao({})}>
+            <Plus size={16} /> Novo usuário
+          </button>
+        )}
       </div>
 
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
@@ -92,7 +96,7 @@ export default function Usuarios() {
                 <th style={estilos.th}>Login</th>
                 <th style={estilos.th}>Perfil</th>
                 <th style={estilos.th}>Status</th>
-                <th style={estilos.th}></th>
+                {podeGerenciarUsuarios && <th style={estilos.th}></th>}
               </tr>
             </thead>
             <tbody>
@@ -109,35 +113,37 @@ export default function Usuarios() {
                       tom={usuario.status ? 'sucesso' : 'perigo'}
                     />
                   </td>
-                  <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
-                    <button
-                      style={estilos.botaoIcone}
-                      title="Editar"
-                      onClick={() => setUsuarioEmEdicao(usuario)}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      style={estilos.botaoIcone}
-                      title={usuario.status ? 'Bloquear' : 'Desbloquear'}
-                      onClick={() => alternarStatus(usuario)}
-                    >
-                      {usuario.status ? <Lock size={16} /> : <Unlock size={16} />}
-                    </button>
-                    <button
-                      style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                      title="Excluir definitivamente"
-                      onClick={() => excluirUsuario(usuario)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+                  {podeGerenciarUsuarios && (
+                    <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
+                      <button
+                        style={estilos.botaoIcone}
+                        title="Editar"
+                        onClick={() => setUsuarioEmEdicao(usuario)}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        style={estilos.botaoIcone}
+                        title={usuario.status ? 'Bloquear' : 'Desbloquear'}
+                        onClick={() => alternarStatus(usuario)}
+                      >
+                        {usuario.status ? <Lock size={16} /> : <Unlock size={16} />}
+                      </button>
+                      <button
+                        style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
+                        title="Excluir definitivamente"
+                        onClick={() => excluirUsuario(usuario)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
 
               {usuarios.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
+                  <td colSpan={podeGerenciarUsuarios ? 7 : 6} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
                     Nenhum usuário cadastrado ainda.
                   </td>
                 </tr>

@@ -3,12 +3,14 @@ import { Plus, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
+import { usePermissoes } from '../hooks/usePermissoes';
 
 const STATUS_OPCOES = ['online', 'offline', 'manutencao'];
 const TOM_STATUS = { online: 'sucesso', offline: 'perigo', manutencao: 'alerta' };
 const ROTULO_STATUS = { online: 'Online', offline: 'Offline', manutencao: 'Manutenção' };
 
 export default function Dispositivos() {
+  const { podeGerenciarCartoesDispositivos } = usePermissoes();
   const [dispositivos, setDispositivos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
@@ -64,9 +66,11 @@ export default function Dispositivos() {
     <div style={estilos.pagina}>
       <div style={estilos.cabecalho}>
         <h1 style={estilos.titulo}>Dispositivos</h1>
-        <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
-          <Plus size={16} /> Novo dispositivo
-        </button>
+        {podeGerenciarCartoesDispositivos && (
+          <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
+            <Plus size={16} /> Novo dispositivo
+          </button>
+        )}
       </div>
 
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
@@ -82,8 +86,12 @@ export default function Dispositivos() {
                 <th style={estilos.th}>Localização</th>
                 <th style={estilos.th}>Status</th>
                 <th style={estilos.th}>Última comunicação</th>
-                <th style={estilos.th}>Mudar status</th>
-                <th style={estilos.th}></th>
+                {podeGerenciarCartoesDispositivos && (
+                  <>
+                    <th style={estilos.th}>Mudar status</th>
+                    <th style={estilos.th}></th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -102,34 +110,38 @@ export default function Dispositivos() {
                       ? new Date(dispositivo.ultima_comunicacao).toLocaleString('pt-BR')
                       : 'Nunca'}
                   </td>
-                  <td style={estilos.td} data-rotulo="Mudar status">
-                    <select
-                      value={dispositivo.status}
-                      onChange={(e) => mudarStatus(dispositivo, e.target.value)}
-                      style={estilos.seletorStatus}
-                    >
-                      {STATUS_OPCOES.map((status) => (
-                        <option key={status} value={status}>
-                          {ROTULO_STATUS[status]}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={estilos.td}>
-                    <button
-                      style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                      title="Excluir"
-                      onClick={() => excluirDispositivo(dispositivo)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+                  {podeGerenciarCartoesDispositivos && (
+                    <>
+                      <td style={estilos.td} data-rotulo="Mudar status">
+                        <select
+                          value={dispositivo.status}
+                          onChange={(e) => mudarStatus(dispositivo, e.target.value)}
+                          style={estilos.seletorStatus}
+                        >
+                          {STATUS_OPCOES.map((status) => (
+                            <option key={status} value={status}>
+                              {ROTULO_STATUS[status]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={estilos.td}>
+                        <button
+                          style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
+                          title="Excluir"
+                          onClick={() => excluirDispositivo(dispositivo)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
 
               {dispositivos.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
+                  <td colSpan={podeGerenciarCartoesDispositivos ? 6 : 4} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
                     Nenhum dispositivo cadastrado ainda.
                   </td>
                 </tr>
