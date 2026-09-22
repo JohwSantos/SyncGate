@@ -57,10 +57,28 @@ npm run dev
 
 ## Tecnologias
 
-**Backend:** Node.js, Express, MySQL, JWT, Socket.io, bcrypt
-**Frontend:** React, Vite, React Router, Socket.io Client
-**Hardware:** ESP32 + leitor RFID
-**Infraestrutura:** Docker, Docker Compose, Nginx
+**Backend**
+- Node.js
+- Express
+- MySQL
+- JWT
+- Socket.io
+- bcrypt
+
+**Frontend**
+- React
+- Vite
+- React Router
+- Socket.io Client
+
+**Hardware**
+- ESP32
+- Leitor RFID
+
+**Infraestrutura**
+- Docker
+- Docker Compose
+- Nginx
 
 ## Funcionalidades
 
