@@ -10,6 +10,7 @@ import Dispositivos from './pages/Dispositivos';
 import Horarios from './pages/Horarios';
 import Solicitacoes from './pages/Solicitacoes';
 import Historico from './pages/Historico';
+import ImportacaoExportacao from './pages/ImportacaoExportacao';
 import EmConstrucao from './pages/EmConstrucao';
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="horarios" element={<Horarios />} />
           <Route path="solicitacoes" element={<Solicitacoes />} />
           <Route path="historico" element={<Historico />} />
+          <Route path="importacao-exportacao" element={<ImportacaoExportacao />} />
         </Route>
       </Routes>
     </AuthProvider>

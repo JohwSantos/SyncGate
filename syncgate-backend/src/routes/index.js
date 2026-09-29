@@ -9,6 +9,7 @@ const dispositivoRoutes = require('./dispositivo.routes');
 const acessoRoutes = require('./acesso.routes');
 const horarioRoutes = require('./horarioAcesso.routes');
 const solicitacaoRoutes = require('./solicitacaoAcesso.routes');
+const csvRoutes = require('./csv.routes');
 
 const router = express.Router();
 
@@ -30,5 +31,6 @@ router.use('/cartoes', verificarToken, cartaoRoutes);
 router.use('/dispositivos', verificarToken, dispositivoRoutes);
 router.use('/horarios', verificarToken, horarioRoutes);
 router.use('/solicitacoes', verificarToken, solicitacaoRoutes);
+router.use('/csv', verificarToken, csvRoutes);
 
 module.exports = router;

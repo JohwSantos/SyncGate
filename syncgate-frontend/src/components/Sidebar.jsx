@@ -7,6 +7,7 @@ import {
   Clock,
   ClipboardList,
   History,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 // Lista central da navegação: cada seção do sistema aparece aqui
@@ -21,6 +22,7 @@ const ITENS = [
   { rota: 'horarios', rotulo: 'Horários', Icone: Clock },
   { rota: 'solicitacoes', rotulo: 'Solicitações', Icone: ClipboardList },
   { rota: 'historico', rotulo: 'Histórico de Acessos', Icone: History },
+  { rota: 'importacao-exportacao', rotulo: 'Importar / Exportar', Icone: FileSpreadsheet },
 ];
 
 export default function Sidebar({ aberto, aoNavegar }) {

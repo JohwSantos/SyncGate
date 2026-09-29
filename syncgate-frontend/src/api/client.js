@@ -40,6 +40,52 @@ const api = {
   put: (caminho, corpo) => requisitar(caminho, { method: 'PUT', body: JSON.stringify(corpo) }),
   patch: (caminho, corpo) => requisitar(caminho, { method: 'PATCH', body: JSON.stringify(corpo) }),
   delete: (caminho) => requisitar(caminho, { method: 'DELETE' }),
+
+  // Upload de arquivo (multipart/form-data) — usado pela importação CSV.
+  // Não define Content-Type manualmente: o fetch calcula o boundary
+  // automaticamente quando recebe um FormData.
+  upload: async (caminho, formData) => {
+    const token = pegarToken();
+    const resposta = await fetch(`${URL_BASE}${caminho}`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const dados = await resposta.json();
+    if (!resposta.ok) {
+      const erro = new Error(dados?.erro || 'Erro ao enviar arquivo');
+      erro.status = resposta.status;
+      throw erro;
+    }
+    return dados;
+  },
+
+  // Download de arquivo (CSV) — dispara o download no navegador.
+  baixarArquivo: async (caminho, nomeArquivo) => {
+    const token = pegarToken();
+    const resposta = await fetch(`${URL_BASE}${caminho}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!resposta.ok) {
+      const dados = await resposta.json().catch(() => ({}));
+      const erro = new Error(dados?.erro || 'Erro ao baixar arquivo');
+      erro.status = resposta.status;
+      throw erro;
+    }
+    const blob = await resposta.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nomeArquivo;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
 };
 
 export { URL_BASE, pegarToken };
