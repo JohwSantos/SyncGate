@@ -11,6 +11,18 @@ async function listarTodos() {
   return linhas;
 }
 
+async function listarPaginado(pagina = 1, limite = 10) {
+  const offset = (pagina - 1) * limite;
+  const [[{ total }]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM cartoes`
+  );
+  const [linhas] = await pool.query(
+    `SELECT * FROM cartoes ORDER BY id_cartao LIMIT ? OFFSET ?`,
+    [limite, offset]
+  );
+  return { dados: linhas, total };
+}
+
 async function buscarPorId(idCartao) {
   const [linhas] = await pool.query(
     `SELECT * FROM cartoes WHERE id_cartao = ?`,
@@ -67,6 +79,7 @@ async function remover(idCartao) {
 
 module.exports = {
   listarTodos,
+  listarPaginado,
   buscarPorId,
   buscarPorUid,
   buscarPorUsuario,

@@ -127,6 +127,10 @@ async function listar() {
   return acessoModel.listarTodos();
 }
 
+async function listarPaginado(pagina, limite) {
+  return acessoModel.listarPaginado(pagina, limite);
+}
+
 async function buscarPorId(id) {
   const acesso = await acessoModel.buscarPorId(id);
   if (!acesso) {
@@ -138,5 +142,6 @@ async function buscarPorId(id) {
 module.exports = {
   validarAcesso,
   listar,
+  listarPaginado,
   buscarPorId,
 };

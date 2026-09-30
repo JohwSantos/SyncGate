@@ -3,6 +3,7 @@ import { Plus, Pencil, Lock, Unlock, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
+import Paginacao from '../components/Paginacao';
 import { usePermissoes } from '../hooks/usePermissoes';
 
 const TIPOS = ['aluno', 'professor', 'funcionario', 'admin'];
@@ -13,15 +14,22 @@ export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
   // null = modal fechado; {} = criando; objeto de usuário = editando
   const [usuarioEmEdicao, setUsuarioEmEdicao] = useState(null);
   const [erroExclusao, setErroExclusao] = useState(null);
 
-  async function carregarUsuarios() {
+  async function carregarUsuarios(pag = pagina) {
     try {
       setCarregando(true);
-      setUsuarios(await api.get('/usuarios'));
+      const resp = await api.get(`/usuarios?pagina=${pag}&limite=10`);
+      setUsuarios(resp.dados);
+      setTotalPaginas(resp.totalPaginas);
+      setTotalRegistros(resp.total);
+      setPagina(resp.pagina);
       setErroLista(null);
     } catch (erro) {
       setErroLista(erro.message);
@@ -31,7 +39,7 @@ export default function Usuarios() {
   }
 
   useEffect(() => {
-    carregarUsuarios();
+    carregarUsuarios(1);
   }, []);
 
   async function alternarStatus(usuario) {
@@ -52,7 +60,7 @@ export default function Usuarios() {
     setErroExclusao(null);
     try {
       await api.delete(`/usuarios/${usuario.id_usuario}`);
-      setUsuarios((atual) => atual.filter((u) => u.id_usuario !== usuario.id_usuario));
+      carregarUsuarios(pagina);
     } catch (erro) {
       // Erro esperado quando o usuário tem cartões/solicitações
       // vinculadas — o backend explica o motivo, só repassamos.
@@ -60,13 +68,8 @@ export default function Usuarios() {
     }
   }
 
-  function aoSalvarUsuario(usuarioSalvo) {
-    setUsuarios((atual) => {
-      const jaExiste = atual.some((u) => u.id_usuario === usuarioSalvo.id_usuario);
-      return jaExiste
-        ? atual.map((u) => (u.id_usuario === usuarioSalvo.id_usuario ? usuarioSalvo : u))
-        : [...atual, usuarioSalvo];
-    });
+  function aoSalvarUsuario() {
+    carregarUsuarios(pagina);
     setUsuarioEmEdicao(null);
   }
 
@@ -150,6 +153,12 @@ export default function Usuarios() {
               )}
             </tbody>
           </table>
+          <Paginacao
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            total={totalRegistros}
+            aoMudar={carregarUsuarios}
+          />
         </div>
       )}
 

@@ -22,6 +22,10 @@ async function listar() {
   return usuarioModel.listarTodos();
 }
 
+async function listarPaginado(pagina, limite) {
+  return usuarioModel.listarPaginado(pagina, limite);
+}
+
 async function buscarPorId(id) {
   const usuario = await usuarioModel.buscarPorId(id);
   if (!usuario) {
@@ -112,6 +116,7 @@ async function remover(id) {
 
 module.exports = {
   listar,
+  listarPaginado,
   buscarPorId,
   criar,
   atualizar,

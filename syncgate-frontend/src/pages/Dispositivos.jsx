@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
+import Paginacao from '../components/Paginacao';
 import { usePermissoes } from '../hooks/usePermissoes';
 
 const STATUS_OPCOES = ['online', 'offline', 'manutencao'];
@@ -16,11 +17,18 @@ export default function Dispositivos() {
   const [erroLista, setErroLista] = useState(null);
   const [erroExclusao, setErroExclusao] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
-  async function carregarDispositivos() {
+  async function carregarDispositivos(pag = pagina) {
     try {
       setCarregando(true);
-      setDispositivos(await api.get('/dispositivos'));
+      const resp = await api.get(`/dispositivos?pagina=${pag}&limite=10`);
+      setDispositivos(resp.dados);
+      setTotalPaginas(resp.totalPaginas);
+      setTotalRegistros(resp.total);
+      setPagina(resp.pagina);
       setErroLista(null);
     } catch (erro) {
       setErroLista(erro.message);
@@ -30,7 +38,7 @@ export default function Dispositivos() {
   }
 
   useEffect(() => {
-    carregarDispositivos();
+    carregarDispositivos(1);
   }, []);
 
   async function mudarStatus(dispositivo, novoStatus) {
@@ -49,7 +57,7 @@ export default function Dispositivos() {
     setErroExclusao(null);
     try {
       await api.delete(`/dispositivos/${dispositivo.id_dispositivo}`);
-      setDispositivos((atual) => atual.filter((d) => d.id_dispositivo !== dispositivo.id_dispositivo));
+      carregarDispositivos(pagina);
     } catch (erro) {
       // Erro esperado quando o dispositivo já tem histórico de
       // acesso vinculado — o backend explica o motivo.
@@ -57,8 +65,8 @@ export default function Dispositivos() {
     }
   }
 
-  function aoCadastrar(dispositivoCriado) {
-    setDispositivos((atual) => [...atual, dispositivoCriado]);
+  function aoCadastrar() {
+    carregarDispositivos(pagina);
     setModalAberto(false);
   }
 
@@ -148,6 +156,12 @@ export default function Dispositivos() {
               )}
             </tbody>
           </table>
+          <Paginacao
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            total={totalRegistros}
+            aoMudar={carregarDispositivos}
+          />
         </div>
       )}
 

@@ -11,6 +11,10 @@ async function listar() {
   return cartaoModel.listarTodos();
 }
 
+async function listarPaginado(pagina, limite) {
+  return cartaoModel.listarPaginado(pagina, limite);
+}
+
 async function buscarPorId(id) {
   const cartao = await cartaoModel.buscarPorId(id);
   if (!cartao) {
@@ -75,6 +79,7 @@ async function remover(id) {
 
 module.exports = {
   listar,
+  listarPaginado,
   buscarPorId,
   listarPorUsuario,
   vincular,

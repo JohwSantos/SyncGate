@@ -3,6 +3,7 @@ import { Plus, Lock, Unlock, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
+import Paginacao from '../components/Paginacao';
 import { usePermissoes } from '../hooks/usePermissoes';
 
 export default function Cartoes() {
@@ -13,15 +14,21 @@ export default function Cartoes() {
   const [erroLista, setErroLista] = useState(null);
   const [erroExclusao, setErroExclusao] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
-  async function carregarDados() {
+  async function carregarDados(pag = pagina) {
     try {
       setCarregando(true);
-      const [listaCartoes, listaUsuarios] = await Promise.all([
-        api.get('/cartoes'),
+      const [respCartoes, listaUsuarios] = await Promise.all([
+        api.get(`/cartoes?pagina=${pag}&limite=10`),
         api.get('/usuarios'),
       ]);
-      setCartoes(listaCartoes);
+      setCartoes(respCartoes.dados);
+      setTotalPaginas(respCartoes.totalPaginas);
+      setTotalRegistros(respCartoes.total);
+      setPagina(respCartoes.pagina);
       setUsuarios(listaUsuarios);
       setErroLista(null);
     } catch (erro) {
@@ -32,7 +39,7 @@ export default function Cartoes() {
   }
 
   useEffect(() => {
-    carregarDados();
+    carregarDados(1);
   }, []);
 
   async function alternarAtivo(cartao) {
@@ -53,7 +60,7 @@ export default function Cartoes() {
     setErroExclusao(null);
     try {
       await api.delete(`/cartoes/${cartao.id_cartao}`);
-      setCartoes((atual) => atual.filter((c) => c.id_cartao !== cartao.id_cartao));
+      carregarDados(pagina);
     } catch (erro) {
       setErroExclusao(erro.message);
     }
@@ -64,8 +71,8 @@ export default function Cartoes() {
     return usuario ? usuario.nome : `Usuário #${idUsuario}`;
   }
 
-  function aoVincular(cartaoCriado) {
-    setCartoes((atual) => [...atual, cartaoCriado]);
+  function aoVincular() {
+    carregarDados(pagina);
     setModalAberto(false);
   }
 
@@ -142,6 +149,12 @@ export default function Cartoes() {
               )}
             </tbody>
           </table>
+          <Paginacao
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            total={totalRegistros}
+            aoMudar={carregarDados}
+          />
         </div>
       )}
 

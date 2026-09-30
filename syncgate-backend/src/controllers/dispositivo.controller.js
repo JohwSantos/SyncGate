@@ -2,6 +2,12 @@ const dispositivoService = require('../services/dispositivo.service');
 
 async function listar(req, res, next) {
   try {
+    if (req.query.pagina) {
+      const pagina = Math.max(1, parseInt(req.query.pagina) || 1);
+      const limite = Math.min(100, Math.max(1, parseInt(req.query.limite) || 10));
+      const { dados, total } = await dispositivoService.listarPaginado(pagina, limite);
+      return res.json({ dados, total, pagina, totalPaginas: Math.ceil(total / limite) });
+    }
     res.json(await dispositivoService.listar());
   } catch (erro) {
     next(erro);

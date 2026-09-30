@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
 import Badge from '../components/Badge';
+import Paginacao from '../components/Paginacao';
 import { useSocket } from '../hooks/useSocket';
 
 function formatarDataHora(iso) {
@@ -13,6 +14,9 @@ export default function Historico() {
   const [dispositivos, setDispositivos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
   const [filtroUsuario, setFiltroUsuario] = useState('todos');
   const [filtroDispositivo, setFiltroDispositivo] = useState('todos');
@@ -21,15 +25,18 @@ export default function Historico() {
   const [dataFim, setDataFim] = useState('');
 
   useEffect(() => {
-    async function carregar() {
+    async function carregar(pag = pagina) {
       try {
         setCarregando(true);
-        const [listaAcessos, listaUsuarios, listaDispositivos] = await Promise.all([
-          api.get('/acesso'),
+        const [respAcessos, listaUsuarios, listaDispositivos] = await Promise.all([
+          api.get(`/acesso?pagina=${pag}&limite=15`),
           api.get('/usuarios'),
           api.get('/dispositivos'),
         ]);
-        setAcessos(listaAcessos);
+        setAcessos(respAcessos.dados);
+        setTotalPaginas(respAcessos.totalPaginas);
+        setTotalRegistros(respAcessos.total);
+        setPagina(respAcessos.pagina);
         setUsuarios(listaUsuarios);
         setDispositivos(listaDispositivos);
         setErro(null);
@@ -39,7 +46,7 @@ export default function Historico() {
         setCarregando(false);
       }
     }
-    carregar();
+    carregar(1);
   }, []);
 
   // Novos acessos entram direto na lista completa — os filtros
@@ -194,12 +201,29 @@ export default function Historico() {
               )}
             </tbody>
           </table>
+          <Paginacao
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            total={totalRegistros}
+            aoMudar={(novaPagina) => {
+              // Extract the loading function out of useEffect in a real refactor,
+              // but for now we can just call api directly or move carregar out.
+              // To be safe and clean, I will just do the API call here to update it.
+              setCarregando(true);
+              api.get(`/acesso?pagina=${novaPagina}&limite=15`).then(resp => {
+                setAcessos(resp.dados);
+                setTotalPaginas(resp.totalPaginas);
+                setTotalRegistros(resp.total);
+                setPagina(resp.pagina);
+                setCarregando(false);
+              }).catch(err => {
+                setErro(err.message);
+                setCarregando(false);
+              });
+            }}
+          />
         </div>
       )}
-
-      <p style={estilos.contagem}>
-        {acessosFiltrados.length} de {acessos.length} registros
-      </p>
     </div>
   );
 }

@@ -23,6 +23,20 @@ async function listarTodos() {
   return linhas;
 }
 
+// Versão paginada: retorna { dados, total } para que o controller
+// possa montar a resposta com metadados de paginação.
+async function listarPaginado(pagina = 1, limite = 10) {
+  const offset = (pagina - 1) * limite;
+  const [[{ total }]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM usuarios`
+  );
+  const [linhas] = await pool.query(
+    `SELECT ${COLUNAS} FROM usuarios ORDER BY nome LIMIT ? OFFSET ?`,
+    [limite, offset]
+  );
+  return { dados: linhas, total };
+}
+
 async function buscarPorId(idUsuario) {
   const [linhas] = await pool.query(
     `SELECT ${COLUNAS} FROM usuarios WHERE id_usuario = ?`,
@@ -100,6 +114,7 @@ async function remover(idUsuario) {
 
 module.exports = {
   listarTodos,
+  listarPaginado,
   buscarPorId,
   buscarPorCpf,
   buscarPorLoginComSenha,

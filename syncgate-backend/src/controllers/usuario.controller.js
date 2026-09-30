@@ -9,6 +9,19 @@ const usuarioService = require('../services/usuario.service');
 
 async function listar(req, res, next) {
   try {
+    // Se ?pagina= for informado, devolve com metadados de paginação.
+    // Caso contrário, devolve o array plano (retrocompatível).
+    if (req.query.pagina) {
+      const pagina = Math.max(1, parseInt(req.query.pagina) || 1);
+      const limite = Math.min(100, Math.max(1, parseInt(req.query.limite) || 10));
+      const { dados, total } = await usuarioService.listarPaginado(pagina, limite);
+      return res.json({
+        dados,
+        total,
+        pagina,
+        totalPaginas: Math.ceil(total / limite),
+      });
+    }
     const usuarios = await usuarioService.listar();
     res.json(usuarios);
   } catch (erro) {

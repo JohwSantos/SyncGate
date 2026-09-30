@@ -10,6 +10,18 @@ async function listarTodos() {
   return linhas;
 }
 
+async function listarPaginado(pagina = 1, limite = 15) {
+  const offset = (pagina - 1) * limite;
+  const [[{ total }]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM acesso`
+  );
+  const [linhas] = await pool.query(
+    `SELECT * FROM acesso ORDER BY data_hora DESC LIMIT ? OFFSET ?`,
+    [limite, offset]
+  );
+  return { dados: linhas, total };
+}
+
 async function buscarPorId(idAcesso) {
   const [linhas] = await pool.query(
     `SELECT * FROM acesso WHERE id_acesso = ?`,
@@ -46,6 +58,7 @@ async function registrar(dados) {
 
 module.exports = {
   listarTodos,
+  listarPaginado,
   buscarPorId,
   buscarUltimoPorUsuario,
   registrar,

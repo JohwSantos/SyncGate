@@ -13,6 +13,10 @@ async function listar() {
   return dispositivoModel.listarTodos();
 }
 
+async function listarPaginado(pagina, limite) {
+  return dispositivoModel.listarPaginado(pagina, limite);
+}
+
 async function buscarPorId(id) {
   const dispositivo = await dispositivoModel.buscarPorId(id);
   if (!dispositivo) {
@@ -86,6 +90,7 @@ async function remover(id) {
 
 module.exports = {
   listar,
+  listarPaginado,
   buscarPorId,
   criar,
   atualizar,

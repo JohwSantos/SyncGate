@@ -10,6 +10,18 @@ async function listarTodos() {
   return linhas;
 }
 
+async function listarPaginado(pagina = 1, limite = 10) {
+  const offset = (pagina - 1) * limite;
+  const [[{ total }]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM dispositivos`
+  );
+  const [linhas] = await pool.query(
+    `SELECT * FROM dispositivos ORDER BY id_dispositivo LIMIT ? OFFSET ?`,
+    [limite, offset]
+  );
+  return { dados: linhas, total };
+}
+
 async function buscarPorId(idDispositivo) {
   const [linhas] = await pool.query(
     `SELECT * FROM dispositivos WHERE id_dispositivo = ?`,
@@ -61,6 +73,7 @@ async function remover(idDispositivo) {
 
 module.exports = {
   listarTodos,
+  listarPaginado,
   buscarPorId,
   criar,
   atualizar,
