@@ -5,7 +5,8 @@ async function listar(req, res, next) {
     if (req.query.pagina) {
       const pagina = Math.max(1, parseInt(req.query.pagina) || 1);
       const limite = Math.min(100, Math.max(1, parseInt(req.query.limite) || 10));
-      const { dados, total } = await cartaoService.listarPaginado(pagina, limite);
+      const busca = String(req.query.busca || '').slice(0, 100);
+      const { dados, total } = await cartaoService.listarPaginado(pagina, limite, busca);
       return res.json({ dados, total, pagina, totalPaginas: Math.ceil(total / limite) });
     }
     res.json(await cartaoService.listar());

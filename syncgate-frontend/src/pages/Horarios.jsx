@@ -25,6 +25,7 @@ export default function Horarios() {
   const [dispositivos, setDispositivos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
+  const [erroAcao, setErroAcao] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
 
   async function carregarDados() {
@@ -60,8 +61,14 @@ export default function Horarios() {
   }
 
   async function remover(horario) {
-    await api.delete(`/horarios/${horario.id_horario}`);
-    setHorarios((atual) => atual.filter((h) => h.id_horario !== horario.id_horario));
+    if (!window.confirm('Remover esta regra de horário?')) return;
+    setErroAcao(null);
+    try {
+      await api.delete(`/horarios/${horario.id_horario}`);
+      setHorarios((atual) => atual.filter((h) => h.id_horario !== horario.id_horario));
+    } catch (erro) {
+      setErroAcao(erro.message);
+    }
   }
 
   function aoCriar(horarioCriado) {
@@ -87,6 +94,7 @@ export default function Horarios() {
 
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
       {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
+      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível remover a regra: {erroAcao}</div>}
 
       {!carregando && !erroLista && (
         <div style={estilos.tabelaContainer}>

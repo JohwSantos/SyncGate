@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 // Modal genérico, reutilizado por todas as telas de cadastro do
@@ -5,12 +6,37 @@ import { X } from 'lucide-react';
 // uma vez só evita reescrever "fundo escuro + caixa centralizada"
 // em cada tela nova.
 export default function Modal({ titulo, aoFechar, children }) {
+  const referenciaConteudo = useRef(null);
+
+  useEffect(() => {
+    const elementoAnterior = document.activeElement;
+    referenciaConteudo.current?.focus();
+
+    function fecharComEscape(evento) {
+      if (evento.key === 'Escape') aoFechar();
+    }
+
+    document.addEventListener('keydown', fecharComEscape);
+    return () => {
+      document.removeEventListener('keydown', fecharComEscape);
+      elementoAnterior?.focus?.();
+    };
+  }, [aoFechar]);
+
   return (
-    <div style={estilos.fundo} onClick={aoFechar}>
-      <div style={estilos.caixa} onClick={(e) => e.stopPropagation()}>
+    <div style={estilos.fundo} onClick={aoFechar} role="presentation">
+      <div
+        style={estilos.caixa}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-titulo"
+        tabIndex={-1}
+        ref={referenciaConteudo}
+      >
         <div style={estilos.cabecalho}>
-          <h2 style={estilos.titulo}>{titulo}</h2>
-          <button onClick={aoFechar} style={estilos.botaoFechar} aria-label="Fechar">
+          <h2 id="modal-titulo" style={estilos.titulo}>{titulo}</h2>
+          <button type="button" onClick={aoFechar} style={estilos.botaoFechar} aria-label="Fechar janela">
             <X size={18} />
           </button>
         </div>

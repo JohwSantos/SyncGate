@@ -15,6 +15,8 @@ export default function Solicitacoes() {
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
+  const [erroAcao, setErroAcao] = useState(null);
+  const [acaoEmAndamento, setAcaoEmAndamento] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
 
   async function carregarDados() {
@@ -56,11 +58,18 @@ export default function Solicitacoes() {
   });
 
   async function decidir(solicitacao, acao) {
-    // acao é 'aprovar' ou 'rejeitar' — vira parte da URL
-    const atualizada = await api.patch(`/solicitacoes/${solicitacao.id_solicitacao}/${acao}`);
-    setSolicitacoes((atual) =>
-      atual.map((s) => (s.id_solicitacao === atualizada.id_solicitacao ? atualizada : s))
-    );
+    setErroAcao(null);
+    setAcaoEmAndamento(solicitacao.id_solicitacao);
+    try {
+      const atualizada = await api.patch(`/solicitacoes/${solicitacao.id_solicitacao}/${acao}`);
+      setSolicitacoes((atual) =>
+        atual.map((s) => (s.id_solicitacao === atualizada.id_solicitacao ? atualizada : s))
+      );
+    } catch (erro) {
+      setErroAcao(erro.message);
+    } finally {
+      setAcaoEmAndamento(null);
+    }
   }
 
   function nomeDoSolicitante(idUsuario) {
@@ -84,6 +93,7 @@ export default function Solicitacoes() {
 
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
       {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
+      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível atualizar a solicitação: {erroAcao}</div>}
 
       {!carregando && !erroLista && (
         <div style={estilos.tabelaContainer}>
@@ -119,6 +129,7 @@ export default function Solicitacoes() {
                         <button
                           style={{ ...estilos.botaoIcone, color: 'var(--cor-sucesso)' }}
                           title="Aprovar"
+                          disabled={acaoEmAndamento === solicitacao.id_solicitacao}
                           onClick={() => decidir(solicitacao, 'aprovar')}
                         >
                           <Check size={16} />
@@ -126,6 +137,7 @@ export default function Solicitacoes() {
                         <button
                           style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
                           title="Rejeitar"
+                          disabled={acaoEmAndamento === solicitacao.id_solicitacao}
                           onClick={() => decidir(solicitacao, 'rejeitar')}
                         >
                           <X size={16} />

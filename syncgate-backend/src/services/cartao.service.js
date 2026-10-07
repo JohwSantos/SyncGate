@@ -11,8 +11,8 @@ async function listar() {
   return cartaoModel.listarTodos();
 }
 
-async function listarPaginado(pagina, limite) {
-  return cartaoModel.listarPaginado(pagina, limite);
+async function listarPaginado(pagina, limite, busca) {
+  return cartaoModel.listarPaginado(pagina, limite, busca);
 }
 
 async function buscarPorId(id) {

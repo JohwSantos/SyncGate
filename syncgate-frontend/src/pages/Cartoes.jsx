@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Plus, Lock, Unlock, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Plus, Lock, Unlock, Trash2, Search } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
@@ -13,16 +13,18 @@ export default function Cartoes() {
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
   const [erroExclusao, setErroExclusao] = useState(null);
+  const [erroAcao, setErroAcao] = useState(null);
+  const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
 
-  async function carregarDados(pag = pagina) {
+  const carregarDados = useCallback(async (pag = 1) => {
     try {
       setCarregando(true);
       const [respCartoes, listaUsuarios] = await Promise.all([
-        api.get(`/cartoes?pagina=${pag}&limite=10`),
+        api.get(`/cartoes?pagina=${pag}&limite=10&busca=${encodeURIComponent(busca.trim())}`),
         api.get('/usuarios'),
       ]);
       setCartoes(respCartoes.dados);
@@ -36,19 +38,25 @@ export default function Cartoes() {
     } finally {
       setCarregando(false);
     }
-  }
+  }, [busca]);
 
   useEffect(() => {
-    carregarDados(1);
-  }, []);
+    const temporizador = setTimeout(() => carregarDados(1), 300);
+    return () => clearTimeout(temporizador);
+  }, [busca, carregarDados]);
 
   async function alternarAtivo(cartao) {
-    const atualizado = await api.patch(`/cartoes/${cartao.id_cartao}/status`, {
-      ativo: !cartao.ativo,
-    });
-    setCartoes((atual) =>
-      atual.map((c) => (c.id_cartao === atualizado.id_cartao ? atualizado : c))
-    );
+    setErroAcao(null);
+    try {
+      const atualizado = await api.patch(`/cartoes/${cartao.id_cartao}/status`, {
+        ativo: !cartao.ativo,
+      });
+      setCartoes((atual) =>
+        atual.map((c) => (c.id_cartao === atualizado.id_cartao ? atualizado : c))
+      );
+    } catch (erro) {
+      setErroAcao(erro.message);
+    }
   }
 
   async function excluirCartao(cartao) {
@@ -87,9 +95,23 @@ export default function Cartoes() {
         )}
       </div>
 
+      <label style={estilos.barraPesquisa}>
+        <Search size={17} aria-hidden="true" />
+        <span style={estilos.rotuloPesquisa}>Pesquisar cartões</span>
+        <input
+          type="search"
+          value={busca}
+          onChange={(evento) => setBusca(evento.target.value)}
+          placeholder="UID, nome ou CPF do usuário"
+          aria-label="Pesquisar por UID, nome ou CPF do usuário"
+          style={estilos.campoPesquisa}
+        />
+      </label>
+
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
       {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
       {erroExclusao && <div style={estilos.faixaErro}>{erroExclusao}</div>}
+      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível alterar o cartão: {erroAcao}</div>}
 
       {!carregando && !erroLista && (
         <div style={estilos.tabelaContainer}>
@@ -248,6 +270,17 @@ const estilos = {
   pagina: { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
   cabecalho: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   titulo: { fontSize: '1.4rem' },
+  barraPesquisa: {
+    display: 'flex', alignItems: 'center', gap: '0.55rem',
+    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
+    borderRadius: 'var(--raio)', padding: '0.65rem 0.8rem',
+    color: 'var(--cor-texto-suave)',
+  },
+  rotuloPesquisa: { fontSize: '0.82rem', fontWeight: 600, whiteSpace: 'nowrap' },
+  campoPesquisa: {
+    flex: 1, minWidth: 0, border: 'none', outline: 'none',
+    color: 'var(--cor-texto)', background: 'transparent',
+  },
   botaoPrimario: {
     display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--cor-blue-600)',
     color: 'white', border: 'none', padding: '0.6rem 1rem', borderRadius: 'var(--raio-pequeno)',

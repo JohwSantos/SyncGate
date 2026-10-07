@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { LogOut, Menu } from 'lucide-react';
+import { LogOut, Menu, Moon, Sun } from 'lucide-react';
 import Sidebar from './Sidebar';
 import { useAuth } from '../context/AuthContext';
+import { useTema } from '../context/TemaContext';
 
 export default function Layout() {
   const { usuario, logout } = useAuth();
+  const { tema, alternarTema } = useTema();
   const [menuAberto, setMenuAberto] = useState(false);
 
   return (
@@ -25,12 +27,25 @@ export default function Layout() {
             className="sg-botao-menu"
             onClick={() => setMenuAberto((atual) => !atual)}
             style={estilos.botaoMenu}
-            aria-label="Abrir menu"
+            aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'}
+            aria-expanded={menuAberto}
+            aria-controls="menu-lateral"
           >
             <Menu size={20} />
           </button>
 
-          <div />
+          <div style={estilos.acoesTopo}>
+            <button
+              type="button"
+              onClick={alternarTema}
+              style={estilos.botaoTema}
+              aria-label={tema === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+              aria-pressed={tema === 'dark'}
+              title={tema === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+            >
+              {tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
 
           <div style={estilos.usuarioLogado}>
             <div style={estilos.avatar}>{usuario?.nome?.charAt(0) ?? '?'}</div>
@@ -80,6 +95,21 @@ const estilos = {
     padding: '0.4rem',
     borderRadius: 'var(--raio-pequeno)',
     display: 'flex',
+  },
+  acoesTopo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  botaoTema: {
+    border: '1px solid var(--cor-borda)',
+    background: 'var(--cor-superficie)',
+    color: 'var(--cor-texto)',
+    padding: '0.4rem',
+    borderRadius: 'var(--raio-pequeno)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   usuarioLogado: {
     display: 'flex',

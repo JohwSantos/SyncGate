@@ -11,14 +11,20 @@ async function listarTodos() {
   return linhas;
 }
 
-async function listarPaginado(pagina = 1, limite = 10) {
+async function listarPaginado(pagina = 1, limite = 10, busca = '') {
   const offset = (pagina - 1) * limite;
+  const termo = `%${busca.trim()}%`;
+  const where = busca.trim()
+    ? 'WHERE c.uid LIKE ? OR u.nome LIKE ? OR u.cpf LIKE ?'
+    : '';
+  const parametrosBusca = busca.trim() ? [termo, termo, termo] : [];
   const [[{ total }]] = await pool.query(
-    `SELECT COUNT(*) AS total FROM cartoes`
+    `SELECT COUNT(*) AS total FROM cartoes c JOIN usuarios u ON u.id_usuario = c.id_usuario ${where}`,
+    parametrosBusca
   );
   const [linhas] = await pool.query(
-    `SELECT * FROM cartoes ORDER BY id_cartao LIMIT ? OFFSET ?`,
-    [limite, offset]
+    `SELECT c.* FROM cartoes c JOIN usuarios u ON u.id_usuario = c.id_usuario ${where} ORDER BY c.id_cartao LIMIT ? OFFSET ?`,
+    [...parametrosBusca, limite, offset]
   );
   return { dados: linhas, total };
 }

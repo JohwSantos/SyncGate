@@ -11,12 +11,15 @@ import Horarios from './pages/Horarios';
 import Solicitacoes from './pages/Solicitacoes';
 import Historico from './pages/Historico';
 import ImportacaoExportacao from './pages/ImportacaoExportacao';
-import EmConstrucao from './pages/EmConstrucao';
+import AcessoNegado from './pages/AcessoNegado';
+import RotaPermissao from './routes/RotaPermissao';
+import { TemaProvider } from './context/TemaContext';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Routes>
+    <TemaProvider>
+      <AuthProvider>
+        <Routes>
         <Route path="/login" element={<Login />} />
 
         {/* O Layout inteiro fica atrás de UMA única RotaPrivada —
@@ -33,15 +36,17 @@ export default function App() {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="usuarios" element={<Usuarios />} />
-          <Route path="cartoes" element={<Cartoes />} />
-          <Route path="dispositivos" element={<Dispositivos />} />
-          <Route path="horarios" element={<Horarios />} />
+          <Route path="acesso-negado" element={<AcessoNegado />} />
+          <Route path="usuarios" element={<RotaPermissao perfis={['gestor', 'master']}><Usuarios /></RotaPermissao>} />
+          <Route path="cartoes" element={<RotaPermissao perfis={['master']}><Cartoes /></RotaPermissao>} />
+          <Route path="dispositivos" element={<RotaPermissao perfis={['master']}><Dispositivos /></RotaPermissao>} />
+          <Route path="horarios" element={<RotaPermissao perfis={['gestor', 'master']}><Horarios /></RotaPermissao>} />
           <Route path="solicitacoes" element={<Solicitacoes />} />
           <Route path="historico" element={<Historico />} />
           <Route path="importacao-exportacao" element={<ImportacaoExportacao />} />
         </Route>
-      </Routes>
-    </AuthProvider>
+        </Routes>
+      </AuthProvider>
+    </TemaProvider>
   );
 }

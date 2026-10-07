@@ -32,6 +32,8 @@ function formatarDataCurta(isoDate) {
 // =====================================================================
 
 function GraficoBarras({ dados, labelKey, titulo }) {
+  const [barraAtiva, setBarraAtiva] = useState(null);
+
   if (!dados || dados.length === 0) {
     return (
       <div style={estilos.graficoVazio}>
@@ -45,8 +47,6 @@ function GraficoBarras({ dados, labelKey, titulo }) {
   const larguraBarra = Math.max(12, Math.min(40, 600 / dados.length - 4));
   const alturaGrafico = 200;
   const larguraTotal = dados.length * (larguraBarra + 4) + 40;
-  const [barraAtiva, setBarraAtiva] = useState(null);
-
   return (
     <div style={estilos.graficoContainer}>
       <h3 style={estilos.graficoTitulo}>{titulo}</h3>
@@ -300,6 +300,7 @@ const PERIODOS = [
 export default function Dashboard() {
   const [resumo, setResumo] = useState(null);
   const [dispositivos, setDispositivos] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [solicitacoesPendentes, setSolicitacoesPendentes] = useState(0);
   const [acessosRecentes, setAcessosRecentes] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -319,18 +320,21 @@ export default function Dashboard() {
           resumoResp,
           listaAcessos,
           listaDispositivos,
+          listaUsuarios,
           listaSolicitacoes,
           horasHoje,
         ] = await Promise.all([
           api.get('/relatorios/resumo'),
           api.get('/acesso'),
           api.get('/dispositivos'),
+          api.get('/usuarios'),
           api.get('/solicitacoes'),
           api.get('/relatorios/por-hora-hoje'),
         ]);
         setResumo(resumoResp);
         setAcessosRecentes(listaAcessos);
         setDispositivos(listaDispositivos);
+        setUsuarios(listaUsuarios);
         setSolicitacoesPendentes(
           listaSolicitacoes.filter((s) => s.status === 'pendente').length
         );
@@ -369,7 +373,28 @@ export default function Dashboard() {
   // WebSocket em tempo real
   const { conectado } = useSocket({
     'novo-acesso': ({ registro }) => {
-      setAcessosRecentes((atual) => [registro, ...atual]);
+      setAcessosRecentes((atual) => [registro, ...atual.filter((item) => item.id_acesso !== registro.id_acesso)]);
+      const hoje = new Date().toDateString() === new Date(registro.data_hora).toDateString();
+      if (hoje) {
+        setResumo((atual) => {
+          if (!atual) return atual;
+          const permitido = registro.status === 'permitido';
+          return {
+            ...atual,
+            hoje: {
+              ...atual.hoje,
+              permitidos: (atual.hoje?.permitidos ?? 0) + (permitido ? 1 : 0),
+              negados: (atual.hoje?.negados ?? 0) + (permitido ? 0 : 1),
+            },
+            totais: {
+              ...atual.totais,
+              acessos: (atual.totais?.acessos ?? 0) + 1,
+              permitidos: (atual.totais?.permitidos ?? 0) + (permitido ? 1 : 0),
+              negados: (atual.totais?.negados ?? 0) + (permitido ? 0 : 1),
+            },
+          };
+        });
+      }
     },
     'dispositivo-atualizado': (dispositivoAtualizado) => {
       setDispositivos((atual) =>
@@ -410,6 +435,8 @@ export default function Dashboard() {
   }
 
   const dispositivosOnline = dispositivos.filter((d) => d.status === 'online').length;
+  const nomeDoUsuario = (idUsuario) =>
+    usuarios.find((usuario) => usuario.id_usuario === idUsuario)?.nome || 'Usuário não identificado';
   const hojePermitidos = resumo?.hoje?.permitidos ?? 0;
   const hojeNegados = resumo?.hoje?.negados ?? 0;
 
@@ -550,7 +577,7 @@ export default function Dashboard() {
         ) : (
           <div style={estilos.listaFeed}>
             {acessosRecentes.slice(0, 15).map((acesso) => (
-              <div key={acesso.id_acesso} style={estilos.linhaFeed}>
+              <div key={acesso.id_acesso} style={estilos.linhaFeed} className="sg-feed-linha">
                 <span
                   style={{
                     ...estilos.selo,
@@ -561,8 +588,8 @@ export default function Dashboard() {
                   {acesso.status === 'permitido' ? 'Permitido' : 'Negado'}
                 </span>
                 <span style={estilos.movimento}>{acesso.tipo_movimento}</span>
-                <span style={estilos.detalhe}>
-                  {acesso.motivo_negado || `Dispositivo #${acesso.id_dispositivo}`}
+                <span style={estilos.detalhe} className="sg-feed-detalhe">
+                  {nomeDoUsuario(acesso.id_usuario)} · {acesso.motivo_negado || `Dispositivo #${acesso.id_dispositivo}`}
                 </span>
                 <span style={estilos.hora}>{formatarHora(acesso.data_hora)}</span>
               </div>

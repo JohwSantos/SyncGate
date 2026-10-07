@@ -9,6 +9,7 @@ import {
   History,
   FileSpreadsheet,
 } from 'lucide-react';
+import { usePermissoes } from '../hooks/usePermissoes';
 
 // Lista central da navegação: cada seção do sistema aparece aqui
 // uma vez só, mesmo que a página de destino ainda seja um
@@ -16,18 +17,26 @@ import {
 // ganham telas de verdade, sem precisar mexer no menu).
 const ITENS = [
   { rota: 'dashboard', rotulo: 'Dashboard', Icone: LayoutDashboard },
-  { rota: 'usuarios', rotulo: 'Usuários', Icone: Users },
-  { rota: 'cartoes', rotulo: 'Cartões RFID', Icone: CreditCard },
-  { rota: 'dispositivos', rotulo: 'Dispositivos', Icone: Router },
-  { rota: 'horarios', rotulo: 'Horários', Icone: Clock },
+  { rota: 'usuarios', rotulo: 'Usuários', Icone: Users, perfis: ['gestor', 'master'] },
+  { rota: 'cartoes', rotulo: 'Cartões RFID', Icone: CreditCard, perfis: ['master'] },
+  { rota: 'dispositivos', rotulo: 'Dispositivos', Icone: Router, perfis: ['master'] },
+  { rota: 'horarios', rotulo: 'Horários', Icone: Clock, perfis: ['gestor', 'master'] },
   { rota: 'solicitacoes', rotulo: 'Solicitações', Icone: ClipboardList },
   { rota: 'historico', rotulo: 'Histórico de Acessos', Icone: History },
   { rota: 'importacao-exportacao', rotulo: 'Importar / Exportar', Icone: FileSpreadsheet },
 ];
 
 export default function Sidebar({ aberto, aoNavegar }) {
+  const { podeGerenciarUsuarios, podeGerenciarCartoesDispositivos, podeGerenciarHorarios } = usePermissoes();
+  const permissoes = {
+    usuarios: podeGerenciarUsuarios,
+    cartoes: podeGerenciarCartoesDispositivos,
+    dispositivos: podeGerenciarCartoesDispositivos,
+    horarios: podeGerenciarHorarios,
+  };
+
   return (
-    <aside style={estilos.barra} className={`sg-sidebar ${aberto ? 'aberto' : ''}`}>
+    <aside id="menu-lateral" style={estilos.barra} className={`sg-sidebar ${aberto ? 'aberto' : ''}`}>
       <div style={estilos.marca}>
         <EscudoS />
         <span style={estilos.wordmark}>
@@ -36,7 +45,7 @@ export default function Sidebar({ aberto, aoNavegar }) {
       </div>
 
       <nav style={estilos.nav}>
-        {ITENS.map(({ rota, rotulo, Icone }) => (
+        {ITENS.filter(({ rota }) => permissoes[rota] !== false).map(({ rota, rotulo, Icone }) => (
           <NavLink
             key={rota}
             to={`/${rota}`}

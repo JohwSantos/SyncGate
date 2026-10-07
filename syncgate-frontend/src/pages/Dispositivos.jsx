@@ -16,6 +16,7 @@ export default function Dispositivos() {
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
   const [erroExclusao, setErroExclusao] = useState(null);
+  const [erroAcao, setErroAcao] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
@@ -42,12 +43,17 @@ export default function Dispositivos() {
   }, []);
 
   async function mudarStatus(dispositivo, novoStatus) {
-    const atualizado = await api.patch(`/dispositivos/${dispositivo.id_dispositivo}/status`, {
-      status: novoStatus,
-    });
-    setDispositivos((atual) =>
-      atual.map((d) => (d.id_dispositivo === atualizado.id_dispositivo ? atualizado : d))
-    );
+    setErroAcao(null);
+    try {
+      const atualizado = await api.patch(`/dispositivos/${dispositivo.id_dispositivo}/status`, {
+        status: novoStatus,
+      });
+      setDispositivos((atual) =>
+        atual.map((d) => (d.id_dispositivo === atualizado.id_dispositivo ? atualizado : d))
+      );
+    } catch (erro) {
+      setErroAcao(erro.message);
+    }
   }
 
   async function excluirDispositivo(dispositivo) {
@@ -84,6 +90,7 @@ export default function Dispositivos() {
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
       {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
       {erroExclusao && <div style={estilos.faixaErro}>{erroExclusao}</div>}
+      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível alterar o dispositivo: {erroAcao}</div>}
 
       {!carregando && !erroLista && (
         <div style={estilos.tabelaContainer}>

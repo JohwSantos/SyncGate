@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '../api/client';
 import Badge from '../components/Badge';
 import Paginacao from '../components/Paginacao';
@@ -24,12 +24,18 @@ export default function Historico() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
 
-  useEffect(() => {
-    async function carregar(pag = pagina) {
+  const carregar = useCallback(async (pag = 1) => {
+    const parametros = new URLSearchParams({ pagina: String(pag), limite: '15' });
+    if (filtroUsuario !== 'todos') parametros.set('idUsuario', filtroUsuario);
+    if (filtroDispositivo !== 'todos') parametros.set('idDispositivo', filtroDispositivo);
+    if (filtroStatus !== 'todos') parametros.set('status', filtroStatus);
+    if (dataInicio) parametros.set('dataInicio', dataInicio);
+    if (dataFim) parametros.set('dataFim', dataFim);
+
       try {
         setCarregando(true);
         const [respAcessos, listaUsuarios, listaDispositivos] = await Promise.all([
-          api.get(`/acesso?pagina=${pag}&limite=15`),
+          api.get(`/acesso?${parametros.toString()}`),
           api.get('/usuarios'),
           api.get('/dispositivos'),
         ]);
@@ -45,16 +51,15 @@ export default function Historico() {
       } finally {
         setCarregando(false);
       }
-    }
-    carregar(1);
-  }, []);
+  }, [filtroUsuario, filtroDispositivo, filtroStatus, dataInicio, dataFim]);
 
-  // Novos acessos entram direto na lista completa — os filtros
-  // (calculados abaixo, via useMemo) decidem sozinhos se o novo
-  // registro deve aparecer ou não na tabela.
+  useEffect(() => {
+    carregar(1);
+  }, [carregar]);
+
   useSocket({
-    'novo-acesso': ({ registro }) => {
-      setAcessos((atual) => [registro, ...atual]);
+    'novo-acesso': () => {
+      carregar(pagina);
     },
   });
 
@@ -69,20 +74,6 @@ export default function Historico() {
       `Dispositivo #${idDispositivo}`
     );
   }
-
-  const acessosFiltrados = useMemo(() => {
-    return acessos.filter((acesso) => {
-      if (filtroUsuario !== 'todos' && String(acesso.id_usuario) !== filtroUsuario) return false;
-      if (filtroDispositivo !== 'todos' && String(acesso.id_dispositivo) !== filtroDispositivo) return false;
-      if (filtroStatus !== 'todos' && acesso.status !== filtroStatus) return false;
-
-      const dataAcesso = new Date(acesso.data_hora);
-      if (dataInicio && dataAcesso < new Date(`${dataInicio}T00:00:00`)) return false;
-      if (dataFim && dataAcesso > new Date(`${dataFim}T23:59:59`)) return false;
-
-      return true;
-    });
-  }, [acessos, filtroUsuario, filtroDispositivo, filtroStatus, dataInicio, dataFim]);
 
   return (
     <div style={estilos.pagina}>
@@ -172,7 +163,7 @@ export default function Historico() {
               </tr>
             </thead>
             <tbody>
-              {acessosFiltrados.map((acesso) => (
+              {acessos.map((acesso) => (
                 <tr key={acesso.id_acesso}>
                   <td style={{ ...estilos.td, fontFamily: 'var(--fonte-mono)', fontSize: '0.8rem' }} data-rotulo="Data/Hora">
                     {formatarDataHora(acesso.data_hora)}
@@ -192,7 +183,7 @@ export default function Historico() {
                 </tr>
               ))}
 
-              {acessosFiltrados.length === 0 && (
+              {acessos.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
                     Nenhum acesso encontrado com esses filtros.
@@ -206,20 +197,7 @@ export default function Historico() {
             totalPaginas={totalPaginas}
             total={totalRegistros}
             aoMudar={(novaPagina) => {
-              // Extract the loading function out of useEffect in a real refactor,
-              // but for now we can just call api directly or move carregar out.
-              // To be safe and clean, I will just do the API call here to update it.
-              setCarregando(true);
-              api.get(`/acesso?pagina=${novaPagina}&limite=15`).then(resp => {
-                setAcessos(resp.dados);
-                setTotalPaginas(resp.totalPaginas);
-                setTotalRegistros(resp.total);
-                setPagina(resp.pagina);
-                setCarregando(false);
-              }).catch(err => {
-                setErro(err.message);
-                setCarregando(false);
-              });
+              carregar(novaPagina);
             }}
           />
         </div>

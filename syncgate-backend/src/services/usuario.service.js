@@ -22,8 +22,8 @@ async function listar() {
   return usuarioModel.listarTodos();
 }
 
-async function listarPaginado(pagina, limite) {
-  return usuarioModel.listarPaginado(pagina, limite);
+async function listarPaginado(pagina, limite, busca) {
+  return usuarioModel.listarPaginado(pagina, limite, busca);
 }
 
 async function buscarPorId(id) {

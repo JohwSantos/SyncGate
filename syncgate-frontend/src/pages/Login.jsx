@@ -137,8 +137,7 @@ const estilos = {
     minHeight: '100vh',
   },
   painelMarca: {
-    background:
-      'linear-gradient(160deg, var(--cor-navy-900) 0%, var(--cor-navy-800) 100%)',
+    background: 'var(--cor-navy-900)',
     color: 'white',
     padding: '3rem',
     display: 'flex',

@@ -25,14 +25,20 @@ async function listarTodos() {
 
 // Versão paginada: retorna { dados, total } para que o controller
 // possa montar a resposta com metadados de paginação.
-async function listarPaginado(pagina = 1, limite = 10) {
+async function listarPaginado(pagina = 1, limite = 10, busca = '') {
   const offset = (pagina - 1) * limite;
+  const termo = `%${busca.trim()}%`;
+  const where = busca.trim()
+    ? 'WHERE nome LIKE ? OR cpf LIKE ? OR login LIKE ? OR matricula LIKE ?'
+    : '';
+  const parametrosBusca = busca.trim() ? [termo, termo, termo, termo] : [];
   const [[{ total }]] = await pool.query(
-    `SELECT COUNT(*) AS total FROM usuarios`
+    `SELECT COUNT(*) AS total FROM usuarios ${where}`,
+    parametrosBusca
   );
   const [linhas] = await pool.query(
-    `SELECT ${COLUNAS} FROM usuarios ORDER BY nome LIMIT ? OFFSET ?`,
-    [limite, offset]
+    `SELECT ${COLUNAS} FROM usuarios ${where} ORDER BY nome LIMIT ? OFFSET ?`,
+    [...parametrosBusca, limite, offset]
   );
   return { dados: linhas, total };
 }

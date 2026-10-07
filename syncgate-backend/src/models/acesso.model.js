@@ -10,14 +10,40 @@ async function listarTodos() {
   return linhas;
 }
 
-async function listarPaginado(pagina = 1, limite = 15) {
+async function listarPaginado(pagina = 1, limite = 15, filtros = {}) {
   const offset = (pagina - 1) * limite;
+  const condicoes = [];
+  const parametros = [];
+
+  if (filtros.idUsuario) {
+    condicoes.push('id_usuario = ?');
+    parametros.push(filtros.idUsuario);
+  }
+  if (filtros.idDispositivo) {
+    condicoes.push('id_dispositivo = ?');
+    parametros.push(filtros.idDispositivo);
+  }
+  if (filtros.status) {
+    condicoes.push('status = ?');
+    parametros.push(filtros.status);
+  }
+  if (filtros.dataInicio) {
+    condicoes.push('data_hora >= ?');
+    parametros.push(`${filtros.dataInicio} 00:00:00`);
+  }
+  if (filtros.dataFim) {
+    condicoes.push('data_hora <= ?');
+    parametros.push(`${filtros.dataFim} 23:59:59`);
+  }
+
+  const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
   const [[{ total }]] = await pool.query(
-    `SELECT COUNT(*) AS total FROM acesso`
+    `SELECT COUNT(*) AS total FROM acesso ${where}`,
+    parametros
   );
   const [linhas] = await pool.query(
-    `SELECT * FROM acesso ORDER BY data_hora DESC LIMIT ? OFFSET ?`,
-    [limite, offset]
+    `SELECT * FROM acesso ${where} ORDER BY data_hora DESC LIMIT ? OFFSET ?`,
+    [...parametros, limite, offset]
   );
   return { dados: linhas, total };
 }

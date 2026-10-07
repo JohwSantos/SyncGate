@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Plus, Pencil, Lock, Unlock, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Plus, Pencil, Lock, Unlock, Trash2, Search } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
@@ -21,11 +21,15 @@ export default function Usuarios() {
   // null = modal fechado; {} = criando; objeto de usuário = editando
   const [usuarioEmEdicao, setUsuarioEmEdicao] = useState(null);
   const [erroExclusao, setErroExclusao] = useState(null);
+  const [erroAcao, setErroAcao] = useState(null);
+  const [busca, setBusca] = useState('');
 
-  async function carregarUsuarios(pag = pagina) {
+  const carregarUsuarios = useCallback(async (pag = 1) => {
     try {
       setCarregando(true);
-      const resp = await api.get(`/usuarios?pagina=${pag}&limite=10`);
+      const resp = await api.get(
+        `/usuarios?pagina=${pag}&limite=10&busca=${encodeURIComponent(busca.trim())}`
+      );
       setUsuarios(resp.dados);
       setTotalPaginas(resp.totalPaginas);
       setTotalRegistros(resp.total);
@@ -36,19 +40,25 @@ export default function Usuarios() {
     } finally {
       setCarregando(false);
     }
-  }
+  }, [busca]);
 
   useEffect(() => {
-    carregarUsuarios(1);
-  }, []);
+    const temporizador = setTimeout(() => carregarUsuarios(1), 300);
+    return () => clearTimeout(temporizador);
+  }, [busca, carregarUsuarios]);
 
   async function alternarStatus(usuario) {
-    const atualizado = await api.patch(`/usuarios/${usuario.id_usuario}/status`, {
-      ativo: !usuario.status,
-    });
-    setUsuarios((atual) =>
-      atual.map((u) => (u.id_usuario === atualizado.id_usuario ? atualizado : u))
-    );
+    setErroAcao(null);
+    try {
+      const atualizado = await api.patch(`/usuarios/${usuario.id_usuario}/status`, {
+        ativo: !usuario.status,
+      });
+      setUsuarios((atual) =>
+        atual.map((u) => (u.id_usuario === atualizado.id_usuario ? atualizado : u))
+      );
+    } catch (erro) {
+      setErroAcao(erro.message);
+    }
   }
 
   async function excluirUsuario(usuario) {
@@ -84,9 +94,23 @@ export default function Usuarios() {
         )}
       </div>
 
+      <label style={estilos.barraPesquisa}>
+        <Search size={17} aria-hidden="true" />
+        <span style={estilos.rotuloPesquisa}>Pesquisar usuários</span>
+        <input
+          type="search"
+          value={busca}
+          onChange={(evento) => setBusca(evento.target.value)}
+          placeholder="Nome, CPF, login ou matrícula"
+          aria-label="Pesquisar por nome, CPF, login ou matrícula"
+          style={estilos.campoPesquisa}
+        />
+      </label>
+
       {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
       {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
       {erroExclusao && <div style={estilos.faixaErro}>{erroExclusao}</div>}
+      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível alterar o usuário: {erroAcao}</div>}
 
       {!carregando && !erroLista && (
         <div style={estilos.tabelaContainer}>
@@ -387,6 +411,17 @@ const estilos = {
   },
   titulo: {
     fontSize: '1.4rem',
+  },
+  barraPesquisa: {
+    display: 'flex', alignItems: 'center', gap: '0.55rem',
+    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
+    borderRadius: 'var(--raio)', padding: '0.65rem 0.8rem',
+    color: 'var(--cor-texto-suave)',
+  },
+  rotuloPesquisa: { fontSize: '0.82rem', fontWeight: 600, whiteSpace: 'nowrap' },
+  campoPesquisa: {
+    flex: 1, minWidth: 0, border: 'none', outline: 'none',
+    color: 'var(--cor-texto)', background: 'transparent',
   },
   botaoPrimario: {
     display: 'flex',

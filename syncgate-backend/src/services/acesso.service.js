@@ -127,8 +127,8 @@ async function listar() {
   return acessoModel.listarTodos();
 }
 
-async function listarPaginado(pagina, limite) {
-  return acessoModel.listarPaginado(pagina, limite);
+async function listarPaginado(pagina, limite, filtros) {
+  return acessoModel.listarPaginado(pagina, limite, filtros);
 }
 
 async function buscarPorId(id) {
