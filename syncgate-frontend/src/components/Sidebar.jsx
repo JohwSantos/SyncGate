@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+﻿import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -11,70 +11,94 @@ import {
 } from 'lucide-react';
 import { usePermissoes } from '../hooks/usePermissoes';
 
-// Lista central da navegação: cada seção do sistema aparece aqui
-// uma vez só, mesmo que a página de destino ainda seja um
-// placeholder "Em construção" (nas próximas etapas, essas rotas
-// ganham telas de verdade, sem precisar mexer no menu).
 const ITENS = [
-  { rota: 'dashboard', rotulo: 'Dashboard', Icone: LayoutDashboard },
-  { rota: 'usuarios', rotulo: 'Usuários', Icone: Users, perfis: ['gestor', 'master'] },
-  { rota: 'cartoes', rotulo: 'Cartões RFID', Icone: CreditCard, perfis: ['master'] },
-  { rota: 'dispositivos', rotulo: 'Dispositivos', Icone: Router, perfis: ['master'] },
-  { rota: 'horarios', rotulo: 'Horários', Icone: Clock, perfis: ['gestor', 'master'] },
-  { rota: 'solicitacoes', rotulo: 'Solicitações', Icone: ClipboardList },
-  { rota: 'historico', rotulo: 'Histórico de Acessos', Icone: History },
-  { rota: 'importacao-exportacao', rotulo: 'Importar / Exportar', Icone: FileSpreadsheet },
+  { rota: 'dashboard',             rotulo: 'Dashboard',            Icone: LayoutDashboard },
+  { rota: 'usuarios',              rotulo: 'Usuarios',             Icone: Users,          perfis: ['gestor','master'] },
+  { rota: 'cartoes',               rotulo: 'Cartoes RFID',         Icone: CreditCard,     perfis: ['master'] },
+  { rota: 'dispositivos',          rotulo: 'Dispositivos',         Icone: Router,         perfis: ['master'] },
+  { rota: 'horarios',              rotulo: 'Horarios',             Icone: Clock,          perfis: ['gestor','master'] },
+  { rota: 'solicitacoes',          rotulo: 'Solicitacoes',         Icone: ClipboardList },
+  { rota: 'historico',             rotulo: 'Historico de Acessos', Icone: History },
+  { rota: 'importacao-exportacao', rotulo: 'Importar / Exportar',  Icone: FileSpreadsheet },
 ];
 
 export default function Sidebar({ aberto, aoNavegar }) {
-  const { podeGerenciarUsuarios, podeGerenciarCartoesDispositivos, podeGerenciarHorarios } = usePermissoes();
+  const {
+    podeGerenciarUsuarios,
+    podeGerenciarCartoesDispositivos,
+    podeGerenciarHorarios,
+  } = usePermissoes();
+
   const permissoes = {
-    usuarios: podeGerenciarUsuarios,
-    cartoes: podeGerenciarCartoesDispositivos,
+    usuarios:    podeGerenciarUsuarios,
+    cartoes:     podeGerenciarCartoesDispositivos,
     dispositivos: podeGerenciarCartoesDispositivos,
-    horarios: podeGerenciarHorarios,
+    horarios:    podeGerenciarHorarios,
   };
 
   return (
-    <aside id="menu-lateral" style={estilos.barra} className={`sg-sidebar ${aberto ? 'aberto' : ''}`}>
-      <div style={estilos.marca}>
-        <EscudoS />
-        <span style={estilos.wordmark}>
-          SYNC<span style={{ color: 'var(--cor-blue-600)' }}>GATE</span>
+    <aside
+      id="menu-lateral"
+      className={`sg-sidebar${aberto ? ' aberto' : ''}`}
+      aria-label="Menu lateral"
+    >
+      {/* Marca */}
+      <div className="sg-sidebar-brand">
+        <LogoMarca />
+        <span className="sg-sidebar-wordmark">
+          SYNC<span>GATE</span>
         </span>
       </div>
 
-      <nav style={estilos.nav}>
-        {ITENS.filter(({ rota }) => permissoes[rota] !== false).map(({ rota, rotulo, Icone }) => (
-          <NavLink
-            key={rota}
-            to={`/${rota}`}
-            onClick={aoNavegar}
-            style={({ isActive }) => ({
-              ...estilos.link,
-              ...(isActive ? estilos.linkAtivo : {}),
-            })}
-          >
-            <Icone size={18} strokeWidth={2} />
-            {rotulo}
-          </NavLink>
-        ))}
+      {/* Navegacao */}
+      <nav className="sg-sidebar-nav" aria-label="Navegacao principal">
+        {ITENS.filter(({ rota }) => permissoes[rota] !== false).map(
+          ({ rota, rotulo, Icone }) => (
+            <NavLink
+              key={rota}
+              to={`/${rota}`}
+              onClick={aoNavegar}
+              className={({ isActive }) =>
+                `sg-nav-item${isActive ? ' active' : ''}`
+              }
+            >
+              <Icone size={16} strokeWidth={2} aria-hidden="true" />
+              {rotulo}
+            </NavLink>
+          )
+        )}
       </nav>
+
+      {/* Rodape discreto */}
+      <div className="sg-sidebar-footer">
+        <span style={{ fontSize: 'var(--sg-text-xs)', color: 'var(--sg-sidebar-text)' }}>
+          SyncGate v1.0
+        </span>
+      </div>
     </aside>
   );
 }
 
-function EscudoS() {
+function LogoMarca() {
   return (
-    <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 100 100"
+      fill="none"
+      aria-hidden="true"
+      style={{ flexShrink: 0 }}
+    >
       <path
-        d="M50 5 L90 22 V50 C90 72 73 90 50 95 C27 90 10 72 10 50 V22 Z"
-        fill="var(--cor-navy-900)"
+        d="M50 6 L88 22 V50 C88 71 71 88 50 94 C29 88 12 71 12 50 V22 Z"
+        fill="rgba(255,255,255,0.10)"
+        stroke="rgba(255,255,255,0.20)"
+        strokeWidth="2"
       />
       <path
-        d="M35 35 L65 35 L35 65 L65 65"
-        stroke="var(--cor-blue-600)"
-        strokeWidth="10"
+        d="M36 36 L64 36 L36 64 L64 64"
+        stroke="#7BA3F5"
+        strokeWidth="9"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
@@ -82,48 +106,3 @@ function EscudoS() {
     </svg>
   );
 }
-
-const estilos = {
-  barra: {
-    width: '15rem',
-    flexShrink: 0,
-    background: 'var(--cor-navy-900)',
-    color: 'white',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '1.25rem 1rem',
-    gap: '1.5rem',
-  },
-  marca: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    padding: '0 0.4rem',
-  },
-  wordmark: {
-    fontFamily: 'var(--fonte-display)',
-    fontWeight: 700,
-    fontSize: '1.05rem',
-    color: 'white',
-  },
-  nav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.25rem',
-  },
-  link: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.7rem',
-    padding: '0.6rem 0.7rem',
-    borderRadius: 'var(--raio-pequeno)',
-    color: 'rgba(255,255,255,0.7)',
-    textDecoration: 'none',
-    fontSize: '0.9rem',
-    fontWeight: 500,
-  },
-  linkAtivo: {
-    background: 'rgba(255,255,255,0.08)',
-    color: 'white',
-  },
-};

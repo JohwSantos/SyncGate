@@ -1,32 +1,49 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+﻿import { useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { LogOut, Menu, Moon, Sun } from 'lucide-react';
 import Sidebar from './Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { useTema } from '../context/TemaContext';
 
+// Mapa de rotas para titulos exibidos no header
+const TITULOS = {
+  '/dashboard':             'Dashboard',
+  '/usuarios':              'Usuarios',
+  '/cartoes':               'Cartoes RFID',
+  '/dispositivos':          'Dispositivos',
+  '/horarios':              'Horarios',
+  '/solicitacoes':          'Solicitacoes',
+  '/historico':             'Historico de Acessos',
+  '/importacao-exportacao': 'Importar / Exportar',
+  '/acesso-negado':         'Acesso negado',
+};
+
 export default function Layout() {
   const { usuario, logout } = useAuth();
   const { tema, alternarTema } = useTema();
   const [menuAberto, setMenuAberto] = useState(false);
+  const location = useLocation();
+
+  const tituloAtual = TITULOS[location.pathname] ?? '';
 
   return (
-    <div style={estilos.pagina}>
+    <div className="sg-app">
       <Sidebar aberto={menuAberto} aoNavegar={() => setMenuAberto(false)} />
 
-      {/* Fundo escuro atrás do menu quando ele está aberto em telas
-          pequenas — clicar nele fecha o menu, como um modal. */}
+      {/* Backdrop mobile */}
       <div
-        className={`sg-sidebar-backdrop ${menuAberto ? 'aberto' : ''}`}
+        className={`sg-sidebar-backdrop${menuAberto ? ' aberto' : ''}`}
         onClick={() => setMenuAberto(false)}
+        aria-hidden="true"
       />
 
-      <div style={estilos.areaConteudo}>
-        <header style={estilos.topo}>
+      <div className="sg-content-area">
+        {/* Header */}
+        <header className="sg-header">
+          {/* Botao menu (so mobile) */}
           <button
-            className="sg-botao-menu"
-            onClick={() => setMenuAberto((atual) => !atual)}
-            style={estilos.botaoMenu}
+            className="sg-btn-menu"
+            onClick={() => setMenuAberto((v) => !v)}
             aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'}
             aria-expanded={menuAberto}
             aria-controls="menu-lateral"
@@ -34,122 +51,52 @@ export default function Layout() {
             <Menu size={20} />
           </button>
 
-          <div style={estilos.acoesTopo}>
+          {/* Titulo da pagina atual */}
+          <span className="sg-header-title">{tituloAtual}</span>
+
+          {/* Acoes do header */}
+          <div className="sg-header-actions">
+            {/* Alternar tema */}
             <button
               type="button"
+              className="sg-btn-theme"
               onClick={alternarTema}
-              style={estilos.botaoTema}
               aria-label={tema === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
               aria-pressed={tema === 'dark'}
-              title={tema === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+              title={tema === 'dark' ? 'Tema claro' : 'Tema escuro'}
             >
-              {tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              {tema === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>
-          </div>
 
-          <div style={estilos.usuarioLogado}>
-            <div style={estilos.avatar}>{usuario?.nome?.charAt(0) ?? '?'}</div>
-            <div>
-              <p style={estilos.nomeUsuario}>{usuario?.nome}</p>
-              <p style={estilos.perfilUsuario}>{usuario?.perfil ?? usuario?.tipo}</p>
+            <div className="sg-header-sep" aria-hidden="true" />
+
+            {/* Usuario logado */}
+            <div className="sg-user-widget">
+              <div className="sg-user-avatar" aria-hidden="true">
+                {usuario?.nome?.charAt(0)?.toUpperCase() ?? '?'}
+              </div>
+              <div className="sg-user-info">
+                <span className="sg-user-name">{usuario?.nome}</span>
+                <span className="sg-user-role">{usuario?.perfil ?? usuario?.tipo ?? 'usuario'}</span>
+              </div>
+              <button
+                type="button"
+                className="sg-btn-logout"
+                onClick={logout}
+                title="Sair"
+                aria-label="Sair da conta"
+              >
+                <LogOut size={15} />
+              </button>
             </div>
-            <button onClick={logout} style={estilos.botaoSair} title="Sair">
-              <LogOut size={18} />
-            </button>
           </div>
         </header>
 
-        <main style={estilos.conteudo} className="sg-conteudo">
+        {/* Conteudo da pagina */}
+        <main className="sg-main sg-conteudo">
           <Outlet />
         </main>
       </div>
     </div>
   );
 }
-
-const estilos = {
-  pagina: {
-    display: 'flex',
-    minHeight: '100vh',
-  },
-  areaConteudo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    minWidth: 0,
-  },
-  topo: {
-    height: '4rem',
-    flexShrink: 0,
-    background: 'var(--cor-superficie)',
-    borderBottom: '1px solid var(--cor-borda)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 1.5rem',
-  },
-  botaoMenu: {
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--cor-texto)',
-    padding: '0.4rem',
-    borderRadius: 'var(--raio-pequeno)',
-    display: 'flex',
-  },
-  acoesTopo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  botaoTema: {
-    border: '1px solid var(--cor-borda)',
-    background: 'var(--cor-superficie)',
-    color: 'var(--cor-texto)',
-    padding: '0.4rem',
-    borderRadius: 'var(--raio-pequeno)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  usuarioLogado: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.7rem',
-  },
-  avatar: {
-    width: '2.1rem',
-    height: '2.1rem',
-    borderRadius: '50%',
-    background: 'var(--cor-blue-50)',
-    color: 'var(--cor-blue-600)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 700,
-    fontFamily: 'var(--fonte-display)',
-  },
-  nomeUsuario: {
-    fontSize: '0.85rem',
-    fontWeight: 600,
-    lineHeight: 1.2,
-  },
-  perfilUsuario: {
-    fontSize: '0.75rem',
-    color: 'var(--cor-texto-suave)',
-    textTransform: 'capitalize',
-  },
-  botaoSair: {
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--cor-texto-suave)',
-    padding: '0.4rem',
-    borderRadius: 'var(--raio-pequeno)',
-    display: 'flex',
-    marginLeft: '0.3rem',
-  },
-  conteudo: {
-    flex: 1,
-    padding: '1.75rem',
-    overflow: 'auto',
-  },
-};

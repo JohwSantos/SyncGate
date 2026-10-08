@@ -1,16 +1,9 @@
-import { useState, useRef } from 'react';
-import { Download, Upload } from 'lucide-react';
+﻿import { useState, useRef } from 'react';
+import { Download, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
 import api from '../api/client';
+import Spinner from './Spinner';
 
-// Componente reutilizável para botões de exportar/importar CSV.
-// Usado nas telas de Usuários, Cartões, Dispositivos e Histórico.
-//
-// Props:
-//   rotaExportar   - caminho da API para exportar (ex: '/csv/usuarios/exportar')
-//   nomeArquivo    - nome do arquivo baixado (ex: 'usuarios.csv')
-//   rotaImportar   - caminho da API para importar (null = só exporta, como no Histórico)
-//   aoImportar     - callback chamado após importação bem-sucedida (para recarregar a lista)
-
+// Componente reutilizavel para botoes de exportar/importar CSV.
 export default function BotoesCSV({ rotaExportar, nomeArquivo, rotaImportar, aoImportar }) {
   const [exportando, setExportando] = useState(false);
   const [importando, setImportando] = useState(false);
@@ -20,6 +13,7 @@ export default function BotoesCSV({ rotaExportar, nomeArquivo, rotaImportar, aoI
 
   async function exportar() {
     setErro(null);
+    setResultado(null);
     setExportando(true);
     try {
       await api.baixarArquivo(rotaExportar, nomeArquivo);
@@ -48,34 +42,33 @@ export default function BotoesCSV({ rotaExportar, nomeArquivo, rotaImportar, aoI
       setErro(e.message);
     } finally {
       setImportando(false);
-      // Limpa o input para permitir importar o mesmo arquivo de novo
       if (inputRef.current) inputRef.current.value = '';
     }
   }
 
   return (
-    <>
-      <div style={estilos.container}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-3)' }}>
+      <div style={{ display: 'flex', gap: 'var(--sg-space-2)', alignItems: 'center' }}>
         <button
-          style={estilos.botao}
+          className="sg-btn sg-btn-secondary"
           onClick={exportar}
           disabled={exportando}
           title="Exportar CSV"
         >
-          <Download size={16} />
-          {exportando ? 'Exportando...' : 'Exportar CSV'}
+          {exportando ? <Spinner tamanho="sm" /> : <Download size={15} />}
+          Exportar CSV
         </button>
 
         {rotaImportar && (
           <>
             <button
-              style={estilos.botao}
+              className="sg-btn sg-btn-secondary"
               onClick={() => inputRef.current?.click()}
               disabled={importando}
               title="Importar CSV"
             >
-              <Upload size={16} />
-              {importando ? 'Importando...' : 'Importar CSV'}
+              {importando ? <Spinner tamanho="sm" /> : <Upload size={15} />}
+              Importar CSV
             </button>
             <input
               ref={inputRef}
@@ -83,66 +76,35 @@ export default function BotoesCSV({ rotaExportar, nomeArquivo, rotaImportar, aoI
               accept=".csv"
               onChange={importar}
               style={{ display: 'none' }}
+              aria-hidden="true"
             />
           </>
         )}
       </div>
 
-      {erro && <div style={estilos.faixaErro}>{erro}</div>}
-
-      {resultado && (
-        <div style={estilos.faixaResultado}>
-          <strong>Importação concluída:</strong>{' '}
-          {resultado.inseridos} inserido(s), {resultado.pulados} pulado(s)
-          {resultado.erros?.length > 0 && (
-            <ul style={estilos.listaErros}>
-              {resultado.erros.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-            </ul>
-          )}
+      {erro && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{erro}</span>
         </div>
       )}
-    </>
+
+      {resultado && (
+        <div className="sg-alert sg-alert--success" role="status">
+          <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <strong>Importacao concluida:</strong>{' '}
+            {resultado.inseridos} inserido(s), {resultado.pulados} pulado(s).
+            {resultado.erros?.length > 0 && (
+              <ul style={{ margin: 'var(--sg-space-2) 0 0', paddingLeft: 'var(--sg-space-4)' }}>
+                {resultado.erros.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
-
-const estilos = {
-  container: {
-    display: 'flex',
-    gap: '0.5rem',
-    alignItems: 'center',
-  },
-  botao: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.35rem',
-    background: 'var(--cor-superficie)',
-    color: 'var(--cor-texto)',
-    border: '1px solid var(--cor-borda)',
-    padding: '0.5rem 0.85rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontWeight: 500,
-    fontSize: '0.82rem',
-    cursor: 'pointer',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)',
-    color: 'var(--cor-perigo)',
-    padding: '0.6rem 0.8rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontSize: '0.85rem',
-  },
-  faixaResultado: {
-    background: 'var(--cor-sucesso-fundo, #ecfdf5)',
-    color: 'var(--cor-sucesso, #047857)',
-    padding: '0.6rem 0.8rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontSize: '0.85rem',
-  },
-  listaErros: {
-    margin: '0.4rem 0 0',
-    paddingLeft: '1.2rem',
-    fontSize: '0.8rem',
-  },
-};

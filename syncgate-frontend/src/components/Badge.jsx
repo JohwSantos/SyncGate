@@ -1,29 +1,16 @@
-// Selo colorido reutilizado em várias telas para mostrar estado
-// (ativo/bloqueado, online/offline, permitido/negado, etc).
-// O texto sempre acompanha a cor — nunca só a cor sozinha,
-// pra continuar legível mesmo pra quem não distingue bem cores.
-const TONS = {
-  sucesso: { fundo: 'var(--cor-sucesso-fundo)', texto: 'var(--cor-sucesso)' },
-  perigo: { fundo: 'var(--cor-perigo-fundo)', texto: 'var(--cor-perigo)' },
-  alerta: { fundo: 'var(--cor-alerta-fundo)', texto: 'var(--cor-alerta)' },
-  neutro: { fundo: 'var(--cor-fundo)', texto: 'var(--cor-texto-suave)' },
+﻿// Mapa de tons para as classes CSS do design system
+const TOM_CLASSE = {
+  sucesso: 'sg-badge--success',
+  perigo:  'sg-badge--danger',
+  alerta:  'sg-badge--warning',
+  neutro:  'sg-badge--neutral',
+  info:    'sg-badge--info',
 };
 
-export default function Badge({ texto, tom = 'neutro' }) {
-  const cores = TONS[tom] || TONS.neutro;
-
+export default function Badge({ texto, tom = 'neutro', semPonto = false }) {
+  const classe = TOM_CLASSE[tom] ?? TOM_CLASSE.neutro;
   return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '0.2rem 0.6rem',
-        borderRadius: '999px',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        background: cores.fundo,
-        color: cores.texto,
-      }}
-    >
+    <span className={`sg-badge ${classe}${semPonto ? ' sg-badge--no-dot' : ''}`}>
       {texto}
     </span>
   );
