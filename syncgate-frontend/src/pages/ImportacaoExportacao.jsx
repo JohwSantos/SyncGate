@@ -1,10 +1,8 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { Download, Upload, Users, CreditCard, Router, History, FileSpreadsheet, CheckCircle, AlertTriangle } from 'lucide-react';
 import api from '../api/client';
+import Spinner from '../components/Spinner';
 import { usePermissoes } from '../hooks/usePermissoes';
-
-// Página dedicada de importação/exportação CSV.
-// Organizada em seções (cards), uma por entidade.
 
 export default function ImportacaoExportacao() {
   const {
@@ -13,33 +11,35 @@ export default function ImportacaoExportacao() {
   } = usePermissoes();
 
   return (
-    <div style={estilos.pagina}>
-      <div style={estilos.cabecalho}>
-        <h1 style={estilos.titulo}>Importação e Exportação</h1>
-        <p style={estilos.subtitulo}>
-          Exporte dados para CSV ou importe registros em lote a partir de arquivos <code>.csv</code>.
-        </p>
+    <div className="sg-page">
+      <div className="sg-page-header">
+        <div className="sg-page-header__left">
+          <h1 className="sg-page-title">Importacao e Exportacao</h1>
+          <p className="sg-page-subtitle">
+            Exporte dados para CSV ou importe registros em lote a partir de arquivos <code>.csv</code>.
+          </p>
+        </div>
       </div>
 
-      <div style={estilos.grid}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 'var(--sg-space-4)' }}>
         <SecaoCSV
-          titulo="Usuários"
-          descricao="Cadastro de alunos, professores, funcionários e administradores."
+          titulo="Usuarios"
+          descricao="Cadastro de alunos, professores, funcionarios e administradores."
           Icone={Users}
           rotaExportar="/csv/usuarios/exportar"
           nomeArquivo="usuarios.csv"
           rotaImportar={podeGerenciarUsuarios ? '/csv/usuarios/importar' : null}
-          dicaImportacao="Campos obrigatórios: nome, cpf, tipo, login, senha. Linhas com CPF já cadastrado serão puladas."
+          dicaImportacao="Campos obrigatorios: nome, cpf, tipo, login, senha. Linhas com CPF ja cadastrado serao puladas."
         />
 
         <SecaoCSV
-          titulo="Cartões RFID"
-          descricao="Cartões vinculados a usuários. Referencia o dono pelo CPF no CSV."
+          titulo="Cartoes RFID"
+          descricao="Cartoes vinculados a usuarios. Referencia o dono pelo CPF no CSV."
           Icone={CreditCard}
           rotaExportar="/csv/cartoes/exportar"
           nomeArquivo="cartoes.csv"
           rotaImportar={podeGerenciarCartoesDispositivos ? '/csv/cartoes/importar' : null}
-          dicaImportacao="Campos obrigatórios: uid, cpf_usuario. Linhas com UID já cadastrado serão puladas."
+          dicaImportacao="Campos obrigatorios: uid, cpf_usuario. Linhas com UID ja cadastrado serao puladas."
         />
 
         <SecaoCSV
@@ -49,12 +49,12 @@ export default function ImportacaoExportacao() {
           rotaExportar="/csv/dispositivos/exportar"
           nomeArquivo="dispositivos.csv"
           rotaImportar={podeGerenciarCartoesDispositivos ? '/csv/dispositivos/importar' : null}
-          dicaImportacao="Campo obrigatório: descricao. Linhas com descrição já existente serão puladas."
+          dicaImportacao="Campo obrigatorio: descricao. Linhas com descricao ja existente serao puladas."
         />
 
         <SecaoCSV
-          titulo="Histórico de Acessos"
-          descricao="Log imutável de todas as tentativas de acesso — somente exportação."
+          titulo="Historico de Acessos"
+          descricao="Log imutavel de todas as tentativas de acesso — somente exportacao."
           Icone={History}
           rotaExportar="/csv/historico/exportar"
           nomeArquivo="historico-acessos.csv"
@@ -66,8 +66,6 @@ export default function ImportacaoExportacao() {
   );
 }
 
-
-// Componente interno: cada "card" de entidade com seus botões.
 function SecaoCSV({ titulo, descricao, Icone, rotaExportar, nomeArquivo, rotaImportar, dicaImportacao }) {
   const [exportando, setExportando] = useState(false);
   const [importando, setImportando] = useState(false);
@@ -110,36 +108,36 @@ function SecaoCSV({ titulo, descricao, Icone, rotaExportar, nomeArquivo, rotaImp
   }
 
   return (
-    <div style={estilos.card}>
-      <div style={estilos.cardCabecalho}>
-        <div style={estilos.cardIcone}>
+    <div className="sg-card">
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--sg-space-3)' }}>
+        <div style={{ background: 'var(--sg-primary)', color: 'white', padding: '0.5rem', borderRadius: 'var(--sg-radius)', display: 'flex', flexShrink: 0 }}>
           <Icone size={20} />
         </div>
         <div>
-          <h2 style={estilos.cardTitulo}>{titulo}</h2>
-          <p style={estilos.cardDescricao}>{descricao}</p>
+          <h2 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0, color: 'var(--sg-text-1)' }}>{titulo}</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--sg-text-2)', margin: '0.2rem 0 0', lineHeight: 1.4 }}>{descricao}</p>
         </div>
       </div>
 
-      <div style={estilos.cardBotoes}>
+      <div style={{ display: 'flex', gap: 'var(--sg-space-2)', marginTop: 'var(--sg-space-4)', flexWrap: 'wrap' }}>
         <button
-          style={estilos.botaoExportar}
+          className="sg-btn sg-btn-secondary"
           onClick={exportar}
           disabled={exportando}
         >
-          <Download size={16} />
-          {exportando ? 'Exportando...' : 'Exportar CSV'}
+          {exportando ? <Spinner tamanho="sm" /> : <Download size={15} />}
+          Exportar CSV
         </button>
 
         {rotaImportar && (
           <>
             <button
-              style={estilos.botaoImportar}
+              className="sg-btn sg-btn-primary"
               onClick={() => inputRef.current?.click()}
               disabled={importando}
             >
-              <Upload size={16} />
-              {importando ? 'Importando...' : 'Importar CSV'}
+              {importando ? <Spinner tamanho="sm" /> : <Upload size={15} />}
+              Importar CSV
             </button>
             <input
               ref={inputRef}
@@ -147,181 +145,44 @@ function SecaoCSV({ titulo, descricao, Icone, rotaExportar, nomeArquivo, rotaImp
               accept=".csv"
               onChange={importar}
               style={{ display: 'none' }}
+              aria-hidden="true"
             />
           </>
         )}
       </div>
 
       {dicaImportacao && rotaImportar && (
-        <p style={estilos.dica}>
-          <FileSpreadsheet size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
-          {dicaImportacao}
-        </p>
+        <div className="sg-alert sg-alert--info" style={{ marginTop: 'var(--sg-space-3)', padding: '0.6rem 0.75rem' }}>
+          <FileSpreadsheet size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <span>{dicaImportacao}</span>
+        </div>
       )}
 
       {erro && (
-        <div style={estilos.faixaErro}>
-          <AlertTriangle size={15} />
-          {erro}
+        <div className="sg-alert sg-alert--error" style={{ marginTop: 'var(--sg-space-3)' }} role="alert">
+          <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <span>{erro}</span>
         </div>
       )}
 
       {resultado && (
-        <div style={estilos.faixaResultado}>
-          <div style={estilos.resultadoResumo}>
-            <CheckCircle size={15} />
+        <div className="sg-alert sg-alert--success" style={{ marginTop: 'var(--sg-space-3)' }} role="status">
+          <CheckCircle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
             <span>
               <strong>{resultado.inseridos}</strong> inserido(s),{' '}
               <strong>{resultado.pulados}</strong> pulado(s)
             </span>
+            {resultado.erros?.length > 0 && (
+              <ul style={{ margin: 'var(--sg-space-2) 0 0', paddingLeft: 'var(--sg-space-3)', color: 'var(--sg-danger)', fontSize: '0.8rem' }}>
+                {resultado.erros.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            )}
           </div>
-          {resultado.erros?.length > 0 && (
-            <ul style={estilos.listaErros}>
-              {resultado.erros.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
     </div>
   );
 }
-
-
-const estilos = {
-  pagina: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1.5rem',
-  },
-  cabecalho: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.3rem',
-  },
-  titulo: {
-    fontSize: '1.4rem',
-    margin: 0,
-  },
-  subtitulo: {
-    fontSize: '0.88rem',
-    color: 'var(--cor-texto-suave)',
-    margin: 0,
-  },
-
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))',
-    gap: '1rem',
-  },
-
-  card: {
-    background: 'var(--cor-superficie)',
-    border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)',
-    padding: '1.25rem',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
-    boxShadow: 'var(--sombra)',
-  },
-  cardCabecalho: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '0.75rem',
-  },
-  cardIcone: {
-    background: 'var(--cor-blue-600)',
-    color: 'white',
-    borderRadius: 'var(--raio-pequeno)',
-    padding: '0.5rem',
-    display: 'flex',
-    flexShrink: 0,
-  },
-  cardTitulo: {
-    fontSize: '1rem',
-    fontWeight: 600,
-    margin: 0,
-  },
-  cardDescricao: {
-    fontSize: '0.82rem',
-    color: 'var(--cor-texto-suave)',
-    margin: '0.15rem 0 0',
-    lineHeight: 1.4,
-  },
-
-  cardBotoes: {
-    display: 'flex',
-    gap: '0.5rem',
-    flexWrap: 'wrap',
-  },
-  botaoExportar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.4rem',
-    background: 'var(--cor-superficie)',
-    color: 'var(--cor-texto)',
-    border: '1px solid var(--cor-borda)',
-    padding: '0.55rem 1rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontWeight: 500,
-    fontSize: '0.85rem',
-    cursor: 'pointer',
-  },
-  botaoImportar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.4rem',
-    background: 'var(--cor-blue-600)',
-    color: 'white',
-    border: 'none',
-    padding: '0.55rem 1rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontWeight: 500,
-    fontSize: '0.85rem',
-    cursor: 'pointer',
-  },
-
-  dica: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '0.4rem',
-    fontSize: '0.78rem',
-    color: 'var(--cor-texto-suave)',
-    margin: 0,
-    lineHeight: 1.45,
-    background: 'var(--cor-fundo)',
-    padding: '0.6rem 0.75rem',
-    borderRadius: 'var(--raio-pequeno)',
-  },
-
-  faixaErro: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.4rem',
-    background: 'var(--cor-perigo-fundo)',
-    color: 'var(--cor-perigo)',
-    padding: '0.65rem 0.85rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontSize: '0.85rem',
-  },
-  faixaResultado: {
-    background: 'var(--cor-sucesso-fundo)',
-    color: 'var(--cor-sucesso)',
-    padding: '0.65rem 0.85rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontSize: '0.85rem',
-  },
-  resultadoResumo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.4rem',
-  },
-  listaErros: {
-    margin: '0.5rem 0 0',
-    paddingLeft: '1.3rem',
-    fontSize: '0.8rem',
-    color: 'var(--cor-perigo)',
-  },
-};

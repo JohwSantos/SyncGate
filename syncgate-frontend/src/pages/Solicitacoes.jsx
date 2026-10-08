@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Plus, Check, X } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
+import Spinner from '../components/Spinner';
+import EstadoVazio from '../components/EstadoVazio';
 import { useSocket } from '../hooks/useSocket';
 import { usePermissoes } from '../hooks/usePermissoes';
 
@@ -40,8 +42,8 @@ export default function Solicitacoes() {
     carregarDados();
   }, []);
 
-  // Se outra pessoa (ou o próprio operador, em outra aba) aprovar
-  // ou rejeitar uma solicitação, essa tela se atualiza sozinha.
+  // Se outra pessoa (ou o proprio operador, em outra aba) aprovar
+  // ou rejeitar uma solicitacao, essa tela se atualiza sozinha.
   useSocket({
     'solicitacao-atualizada': (solicitacaoAtualizada) => {
       setSolicitacoes((atual) => {
@@ -74,7 +76,7 @@ export default function Solicitacoes() {
 
   function nomeDoSolicitante(idUsuario) {
     const usuario = usuarios.find((u) => u.id_usuario === idUsuario);
-    return usuario ? usuario.nome : `Usuário #${idUsuario}`;
+    return usuario ? usuario.nome : `Usuario #${idUsuario}`;
   }
 
   function aoCriar(solicitacaoCriada) {
@@ -83,85 +85,110 @@ export default function Solicitacoes() {
   }
 
   return (
-    <div style={estilos.pagina}>
-      <div style={estilos.cabecalho}>
-        <h1 style={estilos.titulo}>Solicitações de Acesso</h1>
-        <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
-          <Plus size={16} /> Nova solicitação
-        </button>
+    <div className="sg-page">
+      <div className="sg-page-header">
+        <div className="sg-page-header__left">
+          <h1 className="sg-page-title">Solicitacoes de Acesso</h1>
+          <p className="sg-page-subtitle">Aprove ou rejeite entradas de visitantes e alunos sem cartao</p>
+        </div>
+        <div className="sg-page-actions">
+          <button className="sg-btn sg-btn-primary" onClick={() => setModalAberto(true)}>
+            <Plus size={16} /> Nova solicitacao
+          </button>
+        </div>
       </div>
 
-      {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
-      {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
-      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível atualizar a solicitação: {erroAcao}</div>}
+      {erroLista && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erroLista}</span>
+        </div>
+      )}
 
-      {!carregando && !erroLista && (
-        <div style={estilos.tabelaContainer}>
-          <table style={estilos.tabela} className="sg-tabela-responsiva">
+      {erroAcao && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>Nao foi possivel atualizar a solicitacao: {erroAcao}</span>
+        </div>
+      )}
+
+      {carregando ? (
+        <div className="sg-loading-area">
+          <Spinner /> Carregando solicitacoes...
+        </div>
+      ) : !erroLista ? (
+        <div className="sg-table-wrap">
+          <table className="sg-table sg-table-responsive">
             <thead>
               <tr>
-                <th style={estilos.th}>Motivo da visita</th>
-                <th style={estilos.th}>Destinatário</th>
-                <th style={estilos.th}>Solicitante</th>
-                <th style={estilos.th}>Data</th>
-                <th style={estilos.th}>Status</th>
-                <th style={estilos.th}></th>
+                <th>Motivo da visita</th>
+                <th>Destinatario</th>
+                <th>Solicitante</th>
+                <th>Data</th>
+                <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {solicitacoes.map((solicitacao) => (
                 <tr key={solicitacao.id_solicitacao}>
-                  <td style={estilos.td} data-rotulo="Motivo">{solicitacao.motivo_visita}</td>
-                  <td style={estilos.td} data-rotulo="Destinatário">{solicitacao.destinatario || '—'}</td>
-                  <td style={estilos.td} data-rotulo="Solicitante">{nomeDoSolicitante(solicitacao.id_usuario_solicitante)}</td>
-                  <td style={estilos.td} data-rotulo="Data">
+                  <td data-rotulo="Motivo"><strong>{solicitacao.motivo_visita}</strong></td>
+                  <td data-rotulo="Destinatario">{solicitacao.destinatario || '—'}</td>
+                  <td data-rotulo="Solicitante">{nomeDoSolicitante(solicitacao.id_usuario_solicitante)}</td>
+                  <td className="sg-td-mono" data-rotulo="Data">
                     {new Date(solicitacao.data_solicitacao).toLocaleDateString('pt-BR')}
                   </td>
-                  <td style={estilos.td} data-rotulo="Status">
+                  <td data-rotulo="Status">
                     <Badge
                       texto={ROTULO_STATUS[solicitacao.status]}
                       tom={TOM_STATUS[solicitacao.status]}
                     />
                   </td>
-                  <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
-                    {solicitacao.status === 'pendente' && podeAprovarSolicitacoes && (
-                      <>
-                        <button
-                          style={{ ...estilos.botaoIcone, color: 'var(--cor-sucesso)' }}
-                          title="Aprovar"
-                          disabled={acaoEmAndamento === solicitacao.id_solicitacao}
-                          onClick={() => decidir(solicitacao, 'aprovar')}
-                        >
-                          <Check size={16} />
-                        </button>
-                        <button
-                          style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                          title="Rejeitar"
-                          disabled={acaoEmAndamento === solicitacao.id_solicitacao}
-                          onClick={() => decidir(solicitacao, 'rejeitar')}
-                        >
-                          <X size={16} />
-                        </button>
-                      </>
-                    )}
+                  <td className="sg-td-actions">
+                    <div style={{ display: 'flex', gap: 'var(--sg-space-1)', justifyContent: 'flex-end' }}>
+                      {solicitacao.status === 'pendente' && podeAprovarSolicitacoes && (
+                        <>
+                          <button
+                            className="sg-btn sg-btn-ghost sg-btn-icon"
+                            style={{ color: 'var(--sg-success)' }}
+                            title="Aprovar solicitacao"
+                            disabled={acaoEmAndamento === solicitacao.id_solicitacao}
+                            onClick={() => decidir(solicitacao, 'aprovar')}
+                          >
+                            {acaoEmAndamento === solicitacao.id_solicitacao ? <Spinner tamanho="sm" /> : <Check size={16} />}
+                          </button>
+                          <button
+                            className="sg-btn sg-btn-ghost sg-btn-icon"
+                            style={{ color: 'var(--sg-danger)' }}
+                            title="Rejeitar solicitacao"
+                            disabled={acaoEmAndamento === solicitacao.id_solicitacao}
+                            onClick={() => decidir(solicitacao, 'rejeitar')}
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
 
               {solicitacoes.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
-                    Nenhuma solicitação registrada ainda.
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    <EstadoVazio 
+                      icone="busca" 
+                      titulo="Nenhuma solicitacao registrada" 
+                      descricao="Nao ha pedidos de acesso temporario no momento." 
+                    />
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
       {modalAberto && (
-        <Modal titulo="Nova solicitação de acesso" aoFechar={() => setModalAberto(false)}>
+        <Modal titulo="Nova solicitacao de acesso" aoFechar={() => setModalAberto(false)} largura="500px">
           <FormularioSolicitacao usuarios={usuarios} aoSalvar={aoCriar} />
         </Modal>
       )}
@@ -198,111 +225,76 @@ function FormularioSolicitacao({ usuarios, aoSalvar }) {
   }
 
   return (
-    <form onSubmit={aoEnviar} style={estilosForm.form}>
-      <label style={estilosForm.rotulo}>
-        Motivo da visita <span style={{ color: 'var(--cor-perigo)' }}>*</span>
-        <input
-          value={motivoVisita}
-          onChange={(e) => setMotivoVisita(e.target.value)}
-          placeholder="Ex.: Reunião com a coordenação"
-          required
-          style={estilosForm.campo}
-        />
-      </label>
+    <form onSubmit={aoEnviar} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-4)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-3)' }}>
+        <label className="sg-label sg-label-required">
+          Motivo da visita
+          <input
+            type="text"
+            value={motivoVisita}
+            onChange={(e) => setMotivoVisita(e.target.value)}
+            placeholder="Ex.: Reuniao com a coordenacao"
+            required
+            className="sg-input"
+            autoFocus
+          />
+        </label>
 
-      <label style={estilosForm.rotulo}>
-        Solicitado por <span style={{ color: 'var(--cor-perigo)' }}>*</span>
-        <select
-          value={idUsuarioSolicitante}
-          onChange={(e) => setIdUsuarioSolicitante(e.target.value)}
-          required
-          style={estilosForm.campo}
-        >
-          <option value="" disabled>
-            Selecione quem está solicitando
-          </option>
-          {usuarios.map((usuario) => (
-            <option key={usuario.id_usuario} value={usuario.id_usuario}>
-              {usuario.nome} ({usuario.tipo})
-            </option>
-          ))}
-        </select>
-      </label>
+        <label className="sg-label sg-label-required">
+          Solicitado por
+          <select
+            value={idUsuarioSolicitante}
+            onChange={(e) => setIdUsuarioSolicitante(e.target.value)}
+            required
+            className="sg-select"
+          >
+            <option value="" disabled>Selecione quem esta solicitando</option>
+            {usuarios.map((usuario) => (
+              <option key={usuario.id_usuario} value={usuario.id_usuario}>
+                {usuario.nome} ({usuario.tipo})
+              </option>
+            ))}
+          </select>
+        </label>
 
-      <label style={estilosForm.rotulo}>
-        Destinatário (opcional)
-        <input
-          value={destinatario}
-          onChange={(e) => setDestinatario(e.target.value)}
-          placeholder="Ex.: Coordenação Pedagógica"
-          style={estilosForm.campo}
-        />
-      </label>
+        <label className="sg-label">
+          Destinatario (opcional)
+          <input
+            type="text"
+            value={destinatario}
+            onChange={(e) => setDestinatario(e.target.value)}
+            placeholder="Ex.: Coordenacao Pedagogica"
+            className="sg-input"
+          />
+        </label>
 
-      <label style={estilosForm.rotulo}>
-        Documento do visitante (opcional)
-        <input
-          value={documentoVisitante}
-          onChange={(e) => setDocumentoVisitante(e.target.value)}
-          placeholder="RG ou CPF do visitante"
-          style={estilosForm.campo}
-        />
-      </label>
+        <label className="sg-label">
+          Documento do visitante (opcional)
+          <input
+            type="text"
+            value={documentoVisitante}
+            onChange={(e) => setDocumentoVisitante(e.target.value)}
+            placeholder="RG ou CPF do visitante"
+            className="sg-input sg-mono"
+          />
+        </label>
+      </div>
 
-      {erro && <div style={estilosForm.faixaErro}>{erro}</div>}
+      {erro && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erro}</span>
+        </div>
+      )}
 
-      <button type="submit" disabled={salvando} style={estilosForm.botaoSalvar}>
-        {salvando ? 'Salvando...' : 'Registrar solicitação'}
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--sg-space-2)' }}>
+        <button type="submit" disabled={salvando} className="sg-btn sg-btn-primary">
+          {salvando ? (
+            <><Spinner tamanho="sm" /> Registrando...</>
+          ) : (
+            'Registrar solicitacao'
+          )}
+        </button>
+      </div>
     </form>
   );
 }
-
-const estilos = {
-  pagina: { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
-  cabecalho: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  titulo: { fontSize: '1.4rem' },
-  botaoPrimario: {
-    display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--cor-blue-600)',
-    color: 'white', border: 'none', padding: '0.6rem 1rem', borderRadius: 'var(--raio-pequeno)',
-    fontWeight: 600, fontSize: '0.9rem',
-  },
-  tabelaContainer: {
-    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)', overflow: 'auto', boxShadow: 'var(--sombra)',
-  },
-  tabela: { width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' },
-  th: {
-    textAlign: 'left', padding: '0.8rem 1rem', borderBottom: '1px solid var(--cor-borda)',
-    color: 'var(--cor-texto-suave)', fontWeight: 600, fontSize: '0.78rem',
-  },
-  td: { padding: '0.7rem 1rem', borderBottom: '1px solid var(--cor-borda)' },
-  botaoIcone: {
-    border: '1px solid var(--cor-borda)', background: 'var(--cor-superficie)',
-    borderRadius: 'var(--raio-pequeno)', padding: '0.35rem', display: 'flex',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)', color: 'var(--cor-perigo)',
-    padding: '0.8rem 1rem', borderRadius: 'var(--raio)',
-  },
-};
-
-const estilosForm = {
-  form: { display: 'flex', flexDirection: 'column', gap: '0.9rem' },
-  rotulo: {
-    display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem',
-    fontWeight: 500, color: 'var(--cor-texto-suave)',
-  },
-  campo: {
-    padding: '0.55rem 0.7rem', borderRadius: 'var(--raio-pequeno)',
-    border: '1px solid var(--cor-borda)', fontSize: '0.9rem',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)', color: 'var(--cor-perigo)',
-    padding: '0.6rem 0.8rem', borderRadius: 'var(--raio-pequeno)', fontSize: '0.85rem',
-  },
-  botaoSalvar: {
-    marginTop: '0.3rem', padding: '0.7rem', borderRadius: 'var(--raio-pequeno)',
-    border: 'none', background: 'var(--cor-blue-600)', color: 'white', fontWeight: 600,
-  },
-};

@@ -1,26 +1,33 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
 import Paginacao from '../components/Paginacao';
+import Spinner from '../components/Spinner';
+import EstadoVazio from '../components/EstadoVazio';
+import ModalConfirmacao from '../components/ModalConfirmacao';
+import BotoesCSV from '../components/BotoesCSV';
 import { usePermissoes } from '../hooks/usePermissoes';
 
 const STATUS_OPCOES = ['online', 'offline', 'manutencao'];
 const TOM_STATUS = { online: 'sucesso', offline: 'perigo', manutencao: 'alerta' };
-const ROTULO_STATUS = { online: 'Online', offline: 'Offline', manutencao: 'Manutenção' };
+const ROTULO_STATUS = { online: 'Online', offline: 'Offline', manutencao: 'Manutencao' };
 
 export default function Dispositivos() {
   const { podeGerenciarCartoesDispositivos } = usePermissoes();
   const [dispositivos, setDispositivos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
-  const [erroExclusao, setErroExclusao] = useState(null);
   const [erroAcao, setErroAcao] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
+
+  // Para exclusao
+  const [dispositivoExclusao, setDispositivoExclusao] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   async function carregarDispositivos(pag = pagina) {
     try {
@@ -56,18 +63,19 @@ export default function Dispositivos() {
     }
   }
 
-  async function excluirDispositivo(dispositivo) {
-    const confirmou = window.confirm(`Excluir o dispositivo "${dispositivo.descricao}"?`);
-    if (!confirmou) return;
-
-    setErroExclusao(null);
+  async function confirmarExclusao() {
+    if (!dispositivoExclusao) return;
+    setErroAcao(null);
+    setExcluindo(true);
     try {
-      await api.delete(`/dispositivos/${dispositivo.id_dispositivo}`);
+      await api.delete(`/dispositivos/${dispositivoExclusao.id_dispositivo}`);
       carregarDispositivos(pagina);
+      setDispositivoExclusao(null);
     } catch (erro) {
-      // Erro esperado quando o dispositivo já tem histórico de
-      // acesso vinculado — o backend explica o motivo.
-      setErroExclusao(erro.message);
+      setErroAcao(erro.message);
+      setDispositivoExclusao(null);
+    } finally {
+      setExcluindo(false);
     }
   }
 
@@ -77,34 +85,56 @@ export default function Dispositivos() {
   }
 
   return (
-    <div style={estilos.pagina}>
-      <div style={estilos.cabecalho}>
-        <h1 style={estilos.titulo}>Dispositivos</h1>
-        {podeGerenciarCartoesDispositivos && (
-          <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
-            <Plus size={16} /> Novo dispositivo
-          </button>
-        )}
+    <div className="sg-page">
+      <div className="sg-page-header">
+        <div className="sg-page-header__left">
+          <h1 className="sg-page-title">Dispositivos</h1>
+          <p className="sg-page-subtitle">Gerencie as catracas e leitores conectados</p>
+        </div>
+        <div className="sg-page-actions">
+          <BotoesCSV 
+            rotaExportar="/csv/dispositivos/exportar" 
+            nomeArquivo="dispositivos.csv" 
+            rotaImportar="/csv/dispositivos/importar"
+            aoImportar={() => carregarDispositivos(pagina)}
+          />
+          {podeGerenciarCartoesDispositivos && (
+            <button className="sg-btn sg-btn-primary" onClick={() => setModalAberto(true)}>
+              <Plus size={16} /> Novo dispositivo
+            </button>
+          )}
+        </div>
       </div>
 
-      {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
-      {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
-      {erroExclusao && <div style={estilos.faixaErro}>{erroExclusao}</div>}
-      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível alterar o dispositivo: {erroAcao}</div>}
+      {erroLista && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erroLista}</span>
+        </div>
+      )}
 
-      {!carregando && !erroLista && (
-        <div style={estilos.tabelaContainer}>
-          <table style={estilos.tabela} className="sg-tabela-responsiva">
+      {erroAcao && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>Nao foi possivel concluir a acao: {erroAcao}</span>
+        </div>
+      )}
+
+      {carregando ? (
+        <div className="sg-loading-area">
+          <Spinner /> Carregando dispositivos...
+        </div>
+      ) : !erroLista ? (
+        <div className="sg-table-wrap">
+          <table className="sg-table sg-table-responsive">
             <thead>
               <tr>
-                <th style={estilos.th}>Descrição</th>
-                <th style={estilos.th}>Localização</th>
-                <th style={estilos.th}>Status</th>
-                <th style={estilos.th}>Última comunicação</th>
+                <th>Descricao</th>
+                <th>Localizacao</th>
+                <th>Status</th>
+                <th>Ultima comunicacao</th>
                 {podeGerenciarCartoesDispositivos && (
                   <>
-                    <th style={estilos.th}>Mudar status</th>
-                    <th style={estilos.th}></th>
+                    <th>Mudar status</th>
+                    <th></th>
                   </>
                 )}
               </tr>
@@ -112,26 +142,27 @@ export default function Dispositivos() {
             <tbody>
               {dispositivos.map((dispositivo) => (
                 <tr key={dispositivo.id_dispositivo}>
-                  <td style={estilos.td} data-rotulo="Descrição">{dispositivo.descricao}</td>
-                  <td style={estilos.td} data-rotulo="Localização">{dispositivo.localizacao || '—'}</td>
-                  <td style={estilos.td} data-rotulo="Status">
+                  <td data-rotulo="Descricao"><strong>{dispositivo.descricao}</strong></td>
+                  <td data-rotulo="Localizacao">{dispositivo.localizacao || '—'}</td>
+                  <td data-rotulo="Status">
                     <Badge
                       texto={ROTULO_STATUS[dispositivo.status]}
                       tom={TOM_STATUS[dispositivo.status]}
                     />
                   </td>
-                  <td style={estilos.td} data-rotulo="Última comunicação">
+                  <td className="sg-td-mono" data-rotulo="Ultima comunicacao">
                     {dispositivo.ultima_comunicacao
                       ? new Date(dispositivo.ultima_comunicacao).toLocaleString('pt-BR')
                       : 'Nunca'}
                   </td>
                   {podeGerenciarCartoesDispositivos && (
                     <>
-                      <td style={estilos.td} data-rotulo="Mudar status">
+                      <td data-rotulo="Mudar status">
                         <select
                           value={dispositivo.status}
                           onChange={(e) => mudarStatus(dispositivo, e.target.value)}
-                          style={estilos.seletorStatus}
+                          className="sg-select"
+                          style={{ minWidth: '130px' }}
                         >
                           {STATUS_OPCOES.map((status) => (
                             <option key={status} value={status}>
@@ -140,13 +171,14 @@ export default function Dispositivos() {
                           ))}
                         </select>
                       </td>
-                      <td style={estilos.td}>
+                      <td className="sg-td-actions">
                         <button
-                          style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                          title="Excluir"
-                          onClick={() => excluirDispositivo(dispositivo)}
+                          className="sg-btn sg-btn-ghost sg-btn-icon"
+                          style={{ color: 'var(--sg-danger)' }}
+                          title="Excluir dispositivo"
+                          onClick={() => setDispositivoExclusao(dispositivo)}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       </td>
                     </>
@@ -156,8 +188,12 @@ export default function Dispositivos() {
 
               {dispositivos.length === 0 && (
                 <tr>
-                  <td colSpan={podeGerenciarCartoesDispositivos ? 6 : 4} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
-                    Nenhum dispositivo cadastrado ainda.
+                  <td colSpan={podeGerenciarCartoesDispositivos ? 6 : 4} style={{ padding: 0 }}>
+                    <EstadoVazio 
+                      icone="erro" 
+                      titulo="Nenhum dispositivo cadastrado" 
+                      descricao="Nao ha catracas ou leitores registrados no sistema." 
+                    />
                   </td>
                 </tr>
               )}
@@ -170,13 +206,24 @@ export default function Dispositivos() {
             aoMudar={carregarDispositivos}
           />
         </div>
-      )}
+      ) : null}
 
       {modalAberto && (
-        <Modal titulo="Novo dispositivo" aoFechar={() => setModalAberto(false)}>
+        <Modal titulo="Novo dispositivo" aoFechar={() => setModalAberto(false)} largura="500px">
           <FormularioDispositivo aoSalvar={aoCadastrar} />
         </Modal>
       )}
+
+      <ModalConfirmacao
+        aberto={!!dispositivoExclusao}
+        titulo="Excluir dispositivo"
+        mensagem={`Tem certeza que deseja excluir o dispositivo "${dispositivoExclusao?.descricao}"?`}
+        textoConfirmar="Sim, excluir"
+        variante="danger"
+        carregando={excluindo}
+        aoConfirmar={confirmarExclusao}
+        aoCancelar={() => setDispositivoExclusao(null)}
+      />
     </div>
   );
 }
@@ -209,97 +256,66 @@ function FormularioDispositivo({ aoSalvar }) {
   }
 
   return (
-    <form onSubmit={aoEnviar} style={estilosForm.form}>
-      <label style={estilosForm.rotulo}>
-        Descrição <span style={{ color: 'var(--cor-perigo)' }}>*</span>
-        <input
-          value={descricao}
-          onChange={(e) => setDescricao(e.target.value)}
-          placeholder="Ex.: Catraca Entrada Principal"
-          required
-          style={estilosForm.campo}
-        />
-      </label>
+    <form onSubmit={aoEnviar} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-4)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-3)' }}>
+        <label className="sg-label sg-label-required">
+          Descricao
+          <input
+            type="text"
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            placeholder="Ex.: Catraca Entrada Principal"
+            required
+            className="sg-input"
+            autoFocus
+          />
+        </label>
 
-      <label style={estilosForm.rotulo}>
-        Localização
-        <input
-          value={localizacao}
-          onChange={(e) => setLocalizacao(e.target.value)}
-          placeholder="Ex.: Portaria"
-          style={estilosForm.campo}
-        />
-      </label>
+        <label className="sg-label">
+          Localizacao
+          <input
+            type="text"
+            value={localizacao}
+            onChange={(e) => setLocalizacao(e.target.value)}
+            placeholder="Ex.: Portaria"
+            className="sg-input"
+          />
+        </label>
 
-      <label style={estilosForm.rotulo}>
-        IP local (opcional)
-        <input
-          value={ipLocal}
-          onChange={(e) => setIpLocal(e.target.value)}
-          placeholder="Ex.: 192.168.0.50"
-          style={estilosForm.campo}
-        />
-      </label>
+        <label className="sg-label">
+          IP local (opcional)
+          <input
+            type="text"
+            value={ipLocal}
+            onChange={(e) => setIpLocal(e.target.value)}
+            placeholder="Ex.: 192.168.0.50"
+            className="sg-input sg-mono"
+          />
+        </label>
+      </div>
 
-      <p style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
-        Todo dispositivo novo entra como <strong>offline</strong> — mude o status na tabela
-        depois de confirmar que ele está respondendo.
-      </p>
+      <div className="sg-alert sg-alert--info">
+        <span>
+          Todo dispositivo novo entra como <strong>offline</strong>. 
+          Mude o status na tabela depois de confirmar que ele esta respondendo.
+        </span>
+      </div>
 
-      {erro && <div style={estilosForm.faixaErro}>{erro}</div>}
+      {erro && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erro}</span>
+        </div>
+      )}
 
-      <button type="submit" disabled={salvando} style={estilosForm.botaoSalvar}>
-        {salvando ? 'Salvando...' : 'Cadastrar'}
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--sg-space-2)' }}>
+        <button type="submit" disabled={salvando} className="sg-btn sg-btn-primary">
+          {salvando ? (
+            <><Spinner tamanho="sm" /> Cadastrando...</>
+          ) : (
+            'Cadastrar dispositivo'
+          )}
+        </button>
+      </div>
     </form>
   );
 }
-
-const estilos = {
-  pagina: { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
-  cabecalho: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  titulo: { fontSize: '1.4rem' },
-  botaoPrimario: {
-    display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--cor-blue-600)',
-    color: 'white', border: 'none', padding: '0.6rem 1rem', borderRadius: 'var(--raio-pequeno)',
-    fontWeight: 600, fontSize: '0.9rem',
-  },
-  tabelaContainer: {
-    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)', overflow: 'auto', boxShadow: 'var(--sombra)',
-  },
-  tabela: { width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' },
-  th: {
-    textAlign: 'left', padding: '0.8rem 1rem', borderBottom: '1px solid var(--cor-borda)',
-    color: 'var(--cor-texto-suave)', fontWeight: 600, fontSize: '0.78rem',
-  },
-  td: { padding: '0.7rem 1rem', borderBottom: '1px solid var(--cor-borda)' },
-  seletorStatus: {
-    padding: '0.35rem 0.5rem', borderRadius: 'var(--raio-pequeno)',
-    border: '1px solid var(--cor-borda)', fontSize: '0.85rem',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)', color: 'var(--cor-perigo)',
-    padding: '0.8rem 1rem', borderRadius: 'var(--raio)',
-  },
-};
-
-const estilosForm = {
-  form: { display: 'flex', flexDirection: 'column', gap: '0.9rem' },
-  rotulo: {
-    display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem',
-    fontWeight: 500, color: 'var(--cor-texto-suave)',
-  },
-  campo: {
-    padding: '0.55rem 0.7rem', borderRadius: 'var(--raio-pequeno)',
-    border: '1px solid var(--cor-borda)', fontSize: '0.9rem',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)', color: 'var(--cor-perigo)',
-    padding: '0.6rem 0.8rem', borderRadius: 'var(--raio-pequeno)', fontSize: '0.85rem',
-  },
-  botaoSalvar: {
-    marginTop: '0.3rem', padding: '0.7rem', borderRadius: 'var(--raio-pequeno)',
-    border: 'none', background: 'var(--cor-blue-600)', color: 'white', fontWeight: 600,
-  },
-};

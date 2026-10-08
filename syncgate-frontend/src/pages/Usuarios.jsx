@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { Plus, Pencil, Lock, Unlock, Trash2, Search } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
 import Paginacao from '../components/Paginacao';
+import Spinner from '../components/Spinner';
+import EstadoVazio from '../components/EstadoVazio';
+import ModalConfirmacao from '../components/ModalConfirmacao';
+import BotoesCSV from '../components/BotoesCSV';
 import { usePermissoes } from '../hooks/usePermissoes';
 
 const TIPOS = ['aluno', 'professor', 'funcionario', 'admin'];
@@ -18,9 +22,13 @@ export default function Usuarios() {
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
 
-  // null = modal fechado; {} = criando; objeto de usuário = editando
+  // null = modal fechado; {} = criando; objeto de usuario = editando
   const [usuarioEmEdicao, setUsuarioEmEdicao] = useState(null);
-  const [erroExclusao, setErroExclusao] = useState(null);
+  
+  // Para exclusao
+  const [usuarioExclusao, setUsuarioExclusao] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
+
   const [erroAcao, setErroAcao] = useState(null);
   const [busca, setBusca] = useState('');
 
@@ -61,20 +69,19 @@ export default function Usuarios() {
     }
   }
 
-  async function excluirUsuario(usuario) {
-    const confirmou = window.confirm(
-      `Excluir definitivamente "${usuario.nome}"? Esta ação não pode ser desfeita.`
-    );
-    if (!confirmou) return;
-
-    setErroExclusao(null);
+  async function confirmarExclusao() {
+    if (!usuarioExclusao) return;
+    setErroAcao(null);
+    setExcluindo(true);
     try {
-      await api.delete(`/usuarios/${usuario.id_usuario}`);
+      await api.delete(`/usuarios/${usuarioExclusao.id_usuario}`);
       carregarUsuarios(pagina);
+      setUsuarioExclusao(null);
     } catch (erro) {
-      // Erro esperado quando o usuário tem cartões/solicitações
-      // vinculadas — o backend explica o motivo, só repassamos.
-      setErroExclusao(erro.message);
+      setErroAcao(erro.message);
+      setUsuarioExclusao(null);
+    } finally {
+      setExcluindo(false);
     }
   }
 
@@ -84,85 +91,110 @@ export default function Usuarios() {
   }
 
   return (
-    <div style={estilos.pagina}>
-      <div style={estilos.cabecalho}>
-        <h1 style={estilos.titulo}>Usuários</h1>
-        {podeGerenciarUsuarios && (
-          <button style={estilos.botaoPrimario} onClick={() => setUsuarioEmEdicao({})}>
-            <Plus size={16} /> Novo usuário
-          </button>
-        )}
+    <div className="sg-page">
+      <div className="sg-page-header">
+        <div className="sg-page-header__left">
+          <h1 className="sg-page-title">Usuarios</h1>
+          <p className="sg-page-subtitle">Gerencie as pessoas com acesso ao sistema</p>
+        </div>
+        <div className="sg-page-actions">
+          <BotoesCSV 
+            rotaExportar="/csv/usuarios/exportar" 
+            nomeArquivo="usuarios.csv" 
+            rotaImportar="/csv/usuarios/importar"
+            aoImportar={() => carregarUsuarios(pagina)}
+          />
+          {podeGerenciarUsuarios && (
+            <button className="sg-btn sg-btn-primary" onClick={() => setUsuarioEmEdicao({})}>
+              <Plus size={16} /> Novo usuario
+            </button>
+          )}
+        </div>
       </div>
 
-      <label style={estilos.barraPesquisa}>
-        <Search size={17} aria-hidden="true" />
-        <span style={estilos.rotuloPesquisa}>Pesquisar usuários</span>
-        <input
-          type="search"
-          value={busca}
-          onChange={(evento) => setBusca(evento.target.value)}
-          placeholder="Nome, CPF, login ou matrícula"
-          aria-label="Pesquisar por nome, CPF, login ou matrícula"
-          style={estilos.campoPesquisa}
-        />
-      </label>
+      <div className="sg-toolbar">
+        <label className="sg-search">
+          <Search size={16} className="sg-search-icon" aria-hidden="true" />
+          <input
+            type="search"
+            value={busca}
+            onChange={(evento) => setBusca(evento.target.value)}
+            placeholder="Pesquisar por nome, CPF ou login..."
+            className="sg-search-input"
+          />
+        </label>
+      </div>
 
-      {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
-      {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
-      {erroExclusao && <div style={estilos.faixaErro}>{erroExclusao}</div>}
-      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível alterar o usuário: {erroAcao}</div>}
+      {erroLista && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erroLista}</span>
+        </div>
+      )}
 
-      {!carregando && !erroLista && (
-        <div style={estilos.tabelaContainer}>
-          <table style={estilos.tabela} className="sg-tabela-responsiva">
+      {erroAcao && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>Nao foi possivel concluir a acao: {erroAcao}</span>
+        </div>
+      )}
+
+      {carregando ? (
+        <div className="sg-loading-area">
+          <Spinner /> Carregando usuarios...
+        </div>
+      ) : !erroLista ? (
+        <div className="sg-table-wrap">
+          <table className="sg-table sg-table-responsive">
             <thead>
               <tr>
-                <th style={estilos.th}>Nome</th>
-                <th style={estilos.th}>CPF</th>
-                <th style={estilos.th}>Tipo</th>
-                <th style={estilos.th}>Login</th>
-                <th style={estilos.th}>Perfil</th>
-                <th style={estilos.th}>Status</th>
-                {podeGerenciarUsuarios && <th style={estilos.th}></th>}
+                <th>Nome</th>
+                <th>CPF</th>
+                <th>Tipo</th>
+                <th>Login</th>
+                <th>Perfil</th>
+                <th>Status</th>
+                {podeGerenciarUsuarios && <th></th>}
               </tr>
             </thead>
             <tbody>
               {usuarios.map((usuario) => (
                 <tr key={usuario.id_usuario}>
-                  <td style={estilos.td} data-rotulo="Nome">{usuario.nome}</td>
-                  <td style={{ ...estilos.td, fontFamily: 'var(--fonte-mono)' }} data-rotulo="CPF">{usuario.cpf}</td>
-                  <td style={{ ...estilos.td, textTransform: 'capitalize' }} data-rotulo="Tipo">{usuario.tipo}</td>
-                  <td style={estilos.td} data-rotulo="Login">{usuario.login}</td>
-                  <td style={{ ...estilos.td, textTransform: 'capitalize' }} data-rotulo="Perfil">{usuario.perfil || '—'}</td>
-                  <td style={estilos.td} data-rotulo="Status">
+                  <td data-rotulo="Nome"><strong>{usuario.nome}</strong></td>
+                  <td className="sg-td-mono" data-rotulo="CPF">{usuario.cpf}</td>
+                  <td data-rotulo="Tipo" style={{ textTransform: 'capitalize' }}>{usuario.tipo}</td>
+                  <td data-rotulo="Login">{usuario.login}</td>
+                  <td data-rotulo="Perfil" style={{ textTransform: 'capitalize' }}>{usuario.perfil || '—'}</td>
+                  <td data-rotulo="Status">
                     <Badge
                       texto={usuario.status ? 'Ativo' : 'Bloqueado'}
                       tom={usuario.status ? 'sucesso' : 'perigo'}
                     />
                   </td>
                   {podeGerenciarUsuarios && (
-                    <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
-                      <button
-                        style={estilos.botaoIcone}
-                        title="Editar"
-                        onClick={() => setUsuarioEmEdicao(usuario)}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        style={estilos.botaoIcone}
-                        title={usuario.status ? 'Bloquear' : 'Desbloquear'}
-                        onClick={() => alternarStatus(usuario)}
-                      >
-                        {usuario.status ? <Lock size={16} /> : <Unlock size={16} />}
-                      </button>
-                      <button
-                        style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                        title="Excluir definitivamente"
-                        onClick={() => excluirUsuario(usuario)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <td className="sg-td-actions">
+                      <div style={{ display: 'flex', gap: 'var(--sg-space-1)', justifyContent: 'flex-end' }}>
+                        <button
+                          className="sg-btn sg-btn-ghost sg-btn-icon"
+                          title="Editar"
+                          onClick={() => setUsuarioEmEdicao(usuario)}
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          className="sg-btn sg-btn-ghost sg-btn-icon"
+                          title={usuario.status ? 'Bloquear acesso' : 'Desbloquear acesso'}
+                          onClick={() => alternarStatus(usuario)}
+                        >
+                          {usuario.status ? <Lock size={15} /> : <Unlock size={15} />}
+                        </button>
+                        <button
+                          className="sg-btn sg-btn-ghost sg-btn-icon"
+                          style={{ color: 'var(--sg-danger)' }}
+                          title="Excluir definitivamente"
+                          onClick={() => setUsuarioExclusao(usuario)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -170,8 +202,12 @@ export default function Usuarios() {
 
               {usuarios.length === 0 && (
                 <tr>
-                  <td colSpan={podeGerenciarUsuarios ? 7 : 6} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
-                    Nenhum usuário cadastrado ainda.
+                  <td colSpan={podeGerenciarUsuarios ? 7 : 6} style={{ padding: 0 }}>
+                    <EstadoVazio 
+                      icone="busca" 
+                      titulo="Nenhum usuario encontrado" 
+                      descricao={busca ? 'Tente buscar com outros termos.' : 'Nao ha usuarios cadastrados no sistema ainda.'} 
+                    />
                   </td>
                 </tr>
               )}
@@ -184,20 +220,31 @@ export default function Usuarios() {
             aoMudar={carregarUsuarios}
           />
         </div>
-      )}
+      ) : null}
 
       {usuarioEmEdicao !== null && (
         <Modal
-          titulo={usuarioEmEdicao.id_usuario ? 'Editar usuário' : 'Novo usuário'}
+          titulo={usuarioEmEdicao.id_usuario ? 'Editar usuario' : 'Novo usuario'}
           aoFechar={() => setUsuarioEmEdicao(null)}
+          largura="600px"
         >
           <FormularioUsuario usuarioInicial={usuarioEmEdicao} aoSalvar={aoSalvarUsuario} />
         </Modal>
       )}
+
+      <ModalConfirmacao
+        aberto={!!usuarioExclusao}
+        titulo="Excluir usuario"
+        mensagem={`Tem certeza que deseja excluir o usuario "${usuarioExclusao?.nome}"? Esta acao nao pode ser desfeita.`}
+        textoConfirmar="Sim, excluir"
+        variante="danger"
+        carregando={excluindo}
+        aoConfirmar={confirmarExclusao}
+        aoCancelar={() => setUsuarioExclusao(null)}
+      />
     </div>
   );
 }
-
 function FormularioUsuario({ usuarioInicial, aoSalvar }) {
   const emEdicao = !!usuarioInicial.id_usuario;
 
@@ -231,8 +278,6 @@ function FormularioUsuario({ usuarioInicial, aoSalvar }) {
       let usuarioSalvo;
 
       if (emEdicao) {
-        // A API de atualização só aceita estes campos — cpf, tipo,
-        // login e senha não podem ser alterados por aqui.
         usuarioSalvo = await api.put(`/usuarios/${usuarioInicial.id_usuario}`, {
           nome: dados.nome,
           matricula: dados.matricula || null,
@@ -259,261 +304,187 @@ function FormularioUsuario({ usuarioInicial, aoSalvar }) {
   }
 
   return (
-    <form onSubmit={aoEnviar} style={estilosForm.form}>
-      <Campo rotulo="Nome completo" obrigatorio>
-        <input
-          value={dados.nome}
-          onChange={(e) => atualizarCampo('nome', e.target.value)}
-          required
-          style={estilosForm.campo}
-        />
-      </Campo>
-
-      <div style={estilosForm.linha}>
-        <Campo rotulo="CPF" obrigatorio>
-          <input
-            value={dados.cpf}
-            onChange={(e) => atualizarCampo('cpf', e.target.value)}
-            required
-            disabled={emEdicao}
-            style={estilosForm.campo}
-          />
-        </Campo>
-        <Campo rotulo="Tipo" obrigatorio>
-          <select
-            value={dados.tipo}
-            onChange={(e) => atualizarCampo('tipo', e.target.value)}
-            disabled={emEdicao}
-            style={estilosForm.campo}
-          >
-            {TIPOS.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {tipo}
-              </option>
-            ))}
-          </select>
-        </Campo>
-      </div>
-
-      <div style={estilosForm.linha}>
-        <Campo rotulo="Login" obrigatorio>
-          <input
-            value={dados.login}
-            onChange={(e) => atualizarCampo('login', e.target.value)}
-            required
-            disabled={emEdicao}
-            style={estilosForm.campo}
-          />
-        </Campo>
-        {!emEdicao && (
-          <Campo rotulo="Senha" obrigatorio>
+    <form onSubmit={aoEnviar} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-4)' }}>
+      
+      {/* Secao: Dados principais */}
+      <div>
+        <h3 className="sg-section-title">Dados de identificacao</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-3)' }}>
+          <label className="sg-label sg-label-required">
+            Nome completo
             <input
-              type="password"
-              value={dados.senha}
-              onChange={(e) => atualizarCampo('senha', e.target.value)}
+              type="text"
+              value={dados.nome}
+              onChange={(e) => atualizarCampo('nome', e.target.value)}
               required
-              style={estilosForm.campo}
+              className="sg-input"
+              placeholder="Ex: Maria da Silva"
             />
-          </Campo>
-        )}
+          </label>
+
+          <div className="sg-form-row">
+            <label className="sg-label sg-label-required">
+              CPF
+              <input
+                type="text"
+                value={dados.cpf}
+                onChange={(e) => atualizarCampo('cpf', e.target.value)}
+                required
+                disabled={emEdicao}
+                className="sg-input sg-mono"
+                placeholder="000.000.000-00"
+              />
+            </label>
+            <label className="sg-label sg-label-required">
+              Tipo de vinculo
+              <select
+                value={dados.tipo}
+                onChange={(e) => atualizarCampo('tipo', e.target.value)}
+                disabled={emEdicao}
+                className="sg-select"
+                style={{ textTransform: 'capitalize' }}
+              >
+                {TIPOS.map((tipo) => (
+                  <option key={tipo} value={tipo}>{tipo}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
       </div>
 
-      <Campo rotulo="Perfil (acesso ao painel)">
-        <select
-          value={dados.perfil}
-          onChange={(e) => atualizarCampo('perfil', e.target.value)}
-          style={estilosForm.campo}
-        >
-          <option value="">Nenhum</option>
-          {PERFIS.map((perfil) => (
-            <option key={perfil} value={perfil}>
-              {perfil}
-            </option>
-          ))}
-        </select>
-      </Campo>
+      <div className="sg-divider" style={{ margin: 'var(--sg-space-2) 0' }} />
 
-      <div style={estilosForm.linha}>
-        <Campo rotulo="E-mail">
-          <input
-            type="email"
-            value={dados.email}
-            onChange={(e) => atualizarCampo('email', e.target.value)}
-            style={estilosForm.campo}
-          />
-        </Campo>
-        <Campo rotulo="Telefone">
-          <input
-            value={dados.telefone}
-            onChange={(e) => atualizarCampo('telefone', e.target.value)}
-            style={estilosForm.campo}
-          />
-        </Campo>
+      {/* Secao: Acesso */}
+      <div>
+        <h3 className="sg-section-title">Credenciais de acesso</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-3)' }}>
+          <div className="sg-form-row">
+            <label className="sg-label sg-label-required">
+              Login
+              <input
+                type="text"
+                value={dados.login}
+                onChange={(e) => atualizarCampo('login', e.target.value)}
+                required
+                disabled={emEdicao}
+                className="sg-input"
+                placeholder="Ex: maria.silva"
+              />
+            </label>
+            {!emEdicao && (
+              <label className="sg-label sg-label-required">
+                Senha provisoria
+                <input
+                  type="password"
+                  value={dados.senha}
+                  onChange={(e) => atualizarCampo('senha', e.target.value)}
+                  required
+                  className="sg-input"
+                  placeholder="********"
+                />
+              </label>
+            )}
+          </div>
+
+          <label className="sg-label">
+            Perfil no painel administrativo
+            <select
+              value={dados.perfil}
+              onChange={(e) => atualizarCampo('perfil', e.target.value)}
+              className="sg-select"
+              style={{ textTransform: 'capitalize' }}
+            >
+              <option value="">Nenhum (nao acessa o painel)</option>
+              {PERFIS.map((perfil) => (
+                <option key={perfil} value={perfil}>{perfil}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
-      {dados.tipo === 'aluno' && (
-        <div style={estilosForm.linha}>
-          <Campo rotulo="Curso">
-            <input
-              value={dados.curso}
-              onChange={(e) => atualizarCampo('curso', e.target.value)}
-              style={estilosForm.campo}
-            />
-          </Campo>
-          <Campo rotulo="Turma">
-            <input
-              value={dados.turma}
-              onChange={(e) => atualizarCampo('turma', e.target.value)}
-              style={estilosForm.campo}
-            />
-          </Campo>
+      <div className="sg-divider" style={{ margin: 'var(--sg-space-2) 0' }} />
+
+      {/* Secao: Contato */}
+      <div>
+        <h3 className="sg-section-title">Contato e Informacoes</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-3)' }}>
+          <div className="sg-form-row">
+            <label className="sg-label">
+              E-mail
+              <input
+                type="email"
+                value={dados.email}
+                onChange={(e) => atualizarCampo('email', e.target.value)}
+                className="sg-input"
+                placeholder="Ex: maria@email.com"
+              />
+            </label>
+            <label className="sg-label">
+              Telefone
+              <input
+                type="text"
+                value={dados.telefone}
+                onChange={(e) => atualizarCampo('telefone', e.target.value)}
+                className="sg-input sg-mono"
+                placeholder="(11) 90000-0000"
+              />
+            </label>
+          </div>
+
+          {dados.tipo === 'aluno' && (
+            <div className="sg-form-row">
+              <label className="sg-label">
+                Curso
+                <input
+                  type="text"
+                  value={dados.curso}
+                  onChange={(e) => atualizarCampo('curso', e.target.value)}
+                  className="sg-input"
+                />
+              </label>
+              <label className="sg-label">
+                Turma
+                <input
+                  type="text"
+                  value={dados.turma}
+                  onChange={(e) => atualizarCampo('turma', e.target.value)}
+                  className="sg-input"
+                />
+              </label>
+            </div>
+          )}
+
+          {(dados.tipo === 'professor' || dados.tipo === 'funcionario') && (
+            <label className="sg-label">
+              Cargo / Funcao
+              <input
+                type="text"
+                value={dados.cargo}
+                onChange={(e) => atualizarCampo('cargo', e.target.value)}
+                className="sg-input"
+              />
+            </label>
+          )}
+        </div>
+      </div>
+
+      {erro && (
+        <div className="sg-alert sg-alert--error" role="alert" style={{ marginTop: 'var(--sg-space-2)' }}>
+          <span>{erro}</span>
         </div>
       )}
 
-      {(dados.tipo === 'professor' || dados.tipo === 'funcionario') && (
-        <Campo rotulo="Cargo">
-          <input
-            value={dados.cargo}
-            onChange={(e) => atualizarCampo('cargo', e.target.value)}
-            style={estilosForm.campo}
-          />
-        </Campo>
-      )}
-
-      {erro && <div style={estilosForm.faixaErro}>{erro}</div>}
-
-      <button type="submit" disabled={salvando} style={estilosForm.botaoSalvar}>
-        {salvando ? 'Salvando...' : 'Salvar'}
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--sg-space-2)' }}>
+        <button type="submit" disabled={salvando} className="sg-btn sg-btn-primary sg-btn-lg">
+          {salvando ? (
+            <><Spinner tamanho="sm" /> Salvando...</>
+          ) : (
+            emEdicao ? 'Salvar alteracoes' : 'Cadastrar usuario'
+          )}
+        </button>
+      </div>
     </form>
   );
 }
-
-function Campo({ rotulo, obrigatorio, children }) {
-  return (
-    <label style={estilosForm.rotulo}>
-      {rotulo} {obrigatorio && <span style={{ color: 'var(--cor-perigo)' }}>*</span>}
-      {children}
-    </label>
-  );
-}
-
-const estilos = {
-  pagina: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1.25rem',
-  },
-  cabecalho: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  titulo: {
-    fontSize: '1.4rem',
-  },
-  barraPesquisa: {
-    display: 'flex', alignItems: 'center', gap: '0.55rem',
-    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)', padding: '0.65rem 0.8rem',
-    color: 'var(--cor-texto-suave)',
-  },
-  rotuloPesquisa: { fontSize: '0.82rem', fontWeight: 600, whiteSpace: 'nowrap' },
-  campoPesquisa: {
-    flex: 1, minWidth: 0, border: 'none', outline: 'none',
-    color: 'var(--cor-texto)', background: 'transparent',
-  },
-  botaoPrimario: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.4rem',
-    background: 'var(--cor-blue-600)',
-    color: 'white',
-    border: 'none',
-    padding: '0.6rem 1rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontWeight: 600,
-    fontSize: '0.9rem',
-  },
-  tabelaContainer: {
-    background: 'var(--cor-superficie)',
-    border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)',
-    overflow: 'auto',
-    boxShadow: 'var(--sombra)',
-  },
-  tabela: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '0.88rem',
-  },
-  th: {
-    textAlign: 'left',
-    padding: '0.8rem 1rem',
-    borderBottom: '1px solid var(--cor-borda)',
-    color: 'var(--cor-texto-suave)',
-    fontWeight: 600,
-    fontSize: '0.78rem',
-  },
-  td: {
-    padding: '0.7rem 1rem',
-    borderBottom: '1px solid var(--cor-borda)',
-  },
-  botaoIcone: {
-    border: '1px solid var(--cor-borda)',
-    background: 'var(--cor-superficie)',
-    borderRadius: 'var(--raio-pequeno)',
-    padding: '0.35rem',
-    display: 'flex',
-    color: 'var(--cor-texto-suave)',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)',
-    color: 'var(--cor-perigo)',
-    padding: '0.8rem 1rem',
-    borderRadius: 'var(--raio)',
-  },
-};
-
-const estilosForm = {
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.9rem',
-  },
-  linha: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '0.9rem',
-  },
-  rotulo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.35rem',
-    fontSize: '0.82rem',
-    fontWeight: 500,
-    color: 'var(--cor-texto-suave)',
-  },
-  campo: {
-    padding: '0.55rem 0.7rem',
-    borderRadius: 'var(--raio-pequeno)',
-    border: '1px solid var(--cor-borda)',
-    fontSize: '0.9rem',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)',
-    color: 'var(--cor-perigo)',
-    padding: '0.6rem 0.8rem',
-    borderRadius: 'var(--raio-pequeno)',
-    fontSize: '0.85rem',
-  },
-  botaoSalvar: {
-    marginTop: '0.3rem',
-    padding: '0.7rem',
-    borderRadius: 'var(--raio-pequeno)',
-    border: 'none',
-    background: 'var(--cor-blue-600)',
-    color: 'white',
-    fontWeight: 600,
-  },
-};

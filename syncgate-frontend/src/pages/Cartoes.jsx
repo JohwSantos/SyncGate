@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Plus, Lock, Unlock, Trash2, Search } from 'lucide-react';
+﻿import { useCallback, useEffect, useState } from 'react';
+import { Plus, Lock, Unlock, Trash2, Search, CreditCard } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';
 import Paginacao from '../components/Paginacao';
+import Spinner from '../components/Spinner';
+import EstadoVazio from '../components/EstadoVazio';
+import ModalConfirmacao from '../components/ModalConfirmacao';
+import BotoesCSV from '../components/BotoesCSV';
 import { usePermissoes } from '../hooks/usePermissoes';
 
 export default function Cartoes() {
@@ -12,13 +16,16 @@ export default function Cartoes() {
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState(null);
-  const [erroExclusao, setErroExclusao] = useState(null);
   const [erroAcao, setErroAcao] = useState(null);
   const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
+
+  // Para exclusao
+  const [cartaoExclusao, setCartaoExclusao] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   const carregarDados = useCallback(async (pag = 1) => {
     try {
@@ -59,24 +66,25 @@ export default function Cartoes() {
     }
   }
 
-  async function excluirCartao(cartao) {
-    const confirmou = window.confirm(
-      `Excluir o cartão "${cartao.uid}"? O histórico de acessos feitos com ele não será apagado.`
-    );
-    if (!confirmou) return;
-
-    setErroExclusao(null);
+  async function confirmarExclusao() {
+    if (!cartaoExclusao) return;
+    setErroAcao(null);
+    setExcluindo(true);
     try {
-      await api.delete(`/cartoes/${cartao.id_cartao}`);
+      await api.delete(`/cartoes/${cartaoExclusao.id_cartao}`);
       carregarDados(pagina);
+      setCartaoExclusao(null);
     } catch (erro) {
-      setErroExclusao(erro.message);
+      setErroAcao(erro.message);
+      setCartaoExclusao(null);
+    } finally {
+      setExcluindo(false);
     }
   }
 
   function nomeDoUsuario(idUsuario) {
     const usuario = usuarios.find((u) => u.id_usuario === idUsuario);
-    return usuario ? usuario.nome : `Usuário #${idUsuario}`;
+    return usuario ? usuario.nome : `Usuario #${idUsuario}`;
   }
 
   function aoVincular() {
@@ -85,78 +93,103 @@ export default function Cartoes() {
   }
 
   return (
-    <div style={estilos.pagina}>
-      <div style={estilos.cabecalho}>
-        <h1 style={estilos.titulo}>Cartões RFID</h1>
-        {podeGerenciarCartoesDispositivos && (
-          <button style={estilos.botaoPrimario} onClick={() => setModalAberto(true)}>
-            <Plus size={16} /> Vincular cartão
-          </button>
-        )}
+    <div className="sg-page">
+      <div className="sg-page-header">
+        <div className="sg-page-header__left">
+          <h1 className="sg-page-title">Cartoes RFID</h1>
+          <p className="sg-page-subtitle">Gerencie as tags RFID vinculadas aos usuarios</p>
+        </div>
+        <div className="sg-page-actions">
+          <BotoesCSV 
+            rotaExportar="/csv/cartoes/exportar" 
+            nomeArquivo="cartoes.csv" 
+            rotaImportar="/csv/cartoes/importar"
+            aoImportar={() => carregarDados(pagina)}
+          />
+          {podeGerenciarCartoesDispositivos && (
+            <button className="sg-btn sg-btn-primary" onClick={() => setModalAberto(true)}>
+              <Plus size={16} /> Vincular cartao
+            </button>
+          )}
+        </div>
       </div>
 
-      <label style={estilos.barraPesquisa}>
-        <Search size={17} aria-hidden="true" />
-        <span style={estilos.rotuloPesquisa}>Pesquisar cartões</span>
-        <input
-          type="search"
-          value={busca}
-          onChange={(evento) => setBusca(evento.target.value)}
-          placeholder="UID, nome ou CPF do usuário"
-          aria-label="Pesquisar por UID, nome ou CPF do usuário"
-          style={estilos.campoPesquisa}
-        />
-      </label>
+      <div className="sg-toolbar">
+        <label className="sg-search">
+          <Search size={16} className="sg-search-icon" aria-hidden="true" />
+          <input
+            type="search"
+            value={busca}
+            onChange={(evento) => setBusca(evento.target.value)}
+            placeholder="Pesquisar por UID, nome ou CPF..."
+            className="sg-search-input"
+          />
+        </label>
+      </div>
 
-      {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
-      {erroLista && <div style={estilos.faixaErro}>{erroLista}</div>}
-      {erroExclusao && <div style={estilos.faixaErro}>{erroExclusao}</div>}
-      {erroAcao && <div style={estilos.faixaErro} role="alert">Não foi possível alterar o cartão: {erroAcao}</div>}
+      {erroLista && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erroLista}</span>
+        </div>
+      )}
 
-      {!carregando && !erroLista && (
-        <div style={estilos.tabelaContainer}>
-          <table style={estilos.tabela} className="sg-tabela-responsiva">
+      {erroAcao && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>Nao foi possivel concluir a acao: {erroAcao}</span>
+        </div>
+      )}
+
+      {carregando ? (
+        <div className="sg-loading-area">
+          <Spinner /> Carregando cartoes...
+        </div>
+      ) : !erroLista ? (
+        <div className="sg-table-wrap">
+          <table className="sg-table sg-table-responsive">
             <thead>
               <tr>
-                <th style={estilos.th}>UID</th>
-                <th style={estilos.th}>Usuário</th>
-                <th style={estilos.th}>Validade</th>
-                <th style={estilos.th}>Status</th>
-                {podeGerenciarCartoesDispositivos && <th style={estilos.th}></th>}
+                <th>UID</th>
+                <th>Usuario vinculado</th>
+                <th>Validade</th>
+                <th>Status</th>
+                {podeGerenciarCartoesDispositivos && <th></th>}
               </tr>
             </thead>
             <tbody>
               {cartoes.map((cartao) => (
                 <tr key={cartao.id_cartao}>
-                  <td style={{ ...estilos.td, fontFamily: 'var(--fonte-mono)' }} data-rotulo="UID">{cartao.uid}</td>
-                  <td style={estilos.td} data-rotulo="Usuário">{nomeDoUsuario(cartao.id_usuario)}</td>
-                  <td style={estilos.td} data-rotulo="Validade">
+                  <td className="sg-td-mono" data-rotulo="UID"><strong>{cartao.uid}</strong></td>
+                  <td data-rotulo="Usuario">{nomeDoUsuario(cartao.id_usuario)}</td>
+                  <td data-rotulo="Validade">
                     {cartao.data_validade
                       ? new Date(cartao.data_validade).toLocaleDateString('pt-BR')
                       : '—'}
                   </td>
-                  <td style={estilos.td} data-rotulo="Status">
+                  <td data-rotulo="Status">
                     <Badge
                       texto={cartao.ativo ? 'Ativo' : 'Inativo'}
                       tom={cartao.ativo ? 'sucesso' : 'perigo'}
                     />
                   </td>
                   {podeGerenciarCartoesDispositivos && (
-                    <td style={{ ...estilos.td, display: 'flex', gap: '0.4rem' }}>
-                      <button
-                        style={estilos.botaoIcone}
-                        title={cartao.ativo ? 'Desativar' : 'Ativar'}
-                        onClick={() => alternarAtivo(cartao)}
-                      >
-                        {cartao.ativo ? <Lock size={16} /> : <Unlock size={16} />}
-                      </button>
-                      <button
-                        style={{ ...estilos.botaoIcone, color: 'var(--cor-perigo)' }}
-                        title="Excluir"
-                        onClick={() => excluirCartao(cartao)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <td className="sg-td-actions">
+                      <div style={{ display: 'flex', gap: 'var(--sg-space-1)', justifyContent: 'flex-end' }}>
+                        <button
+                          className="sg-btn sg-btn-ghost sg-btn-icon"
+                          title={cartao.ativo ? 'Desativar cartao' : 'Ativar cartao'}
+                          onClick={() => alternarAtivo(cartao)}
+                        >
+                          {cartao.ativo ? <Lock size={15} /> : <Unlock size={15} />}
+                        </button>
+                        <button
+                          className="sg-btn sg-btn-ghost sg-btn-icon"
+                          style={{ color: 'var(--sg-danger)' }}
+                          title="Excluir cartao"
+                          onClick={() => setCartaoExclusao(cartao)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -164,8 +197,12 @@ export default function Cartoes() {
 
               {cartoes.length === 0 && (
                 <tr>
-                  <td colSpan={podeGerenciarCartoesDispositivos ? 5 : 4} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
-                    Nenhum cartão vinculado ainda.
+                  <td colSpan={podeGerenciarCartoesDispositivos ? 5 : 4} style={{ padding: 0 }}>
+                    <EstadoVazio 
+                      icone="busca" 
+                      titulo="Nenhum cartao encontrado" 
+                      descricao={busca ? 'Tente buscar com outros termos.' : 'Nenhum cartao RFID foi vinculado no sistema.'} 
+                    />
                   </td>
                 </tr>
               )}
@@ -178,13 +215,24 @@ export default function Cartoes() {
             aoMudar={carregarDados}
           />
         </div>
-      )}
+      ) : null}
 
       {modalAberto && (
-        <Modal titulo="Vincular novo cartão" aoFechar={() => setModalAberto(false)}>
+        <Modal titulo="Vincular novo cartao" aoFechar={() => setModalAberto(false)} largura="500px">
           <FormularioCartao usuarios={usuarios} aoSalvar={aoVincular} />
         </Modal>
       )}
+
+      <ModalConfirmacao
+        aberto={!!cartaoExclusao}
+        titulo="Excluir cartao"
+        mensagem={`Tem certeza que deseja excluir o cartao UID "${cartaoExclusao?.uid}"? O historico de acessos feitos com ele nao sera apagado.`}
+        textoConfirmar="Sim, excluir"
+        variante="danger"
+        carregando={excluindo}
+        aoConfirmar={confirmarExclusao}
+        aoCancelar={() => setCartaoExclusao(null)}
+      />
     </div>
   );
 }
@@ -216,113 +264,64 @@ function FormularioCartao({ usuarios, aoSalvar }) {
   }
 
   return (
-    <form onSubmit={aoEnviar} style={estilosForm.form}>
-      <label style={estilosForm.rotulo}>
-        UID do cartão <span style={{ color: 'var(--cor-perigo)' }}>*</span>
-        <input
-          value={uid}
-          onChange={(e) => setUid(e.target.value)}
-          placeholder="Ex.: A1B2C3D4"
-          required
-          style={estilosForm.campo}
-        />
-      </label>
+    <form onSubmit={aoEnviar} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-4)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sg-space-3)' }}>
+        <label className="sg-label sg-label-required">
+          UID do cartao
+          <input
+            type="text"
+            value={uid}
+            onChange={(e) => setUid(e.target.value)}
+            placeholder="Ex.: A1B2C3D4"
+            required
+            className="sg-input sg-mono"
+            autoFocus
+          />
+        </label>
 
-      <label style={estilosForm.rotulo}>
-        Usuário <span style={{ color: 'var(--cor-perigo)' }}>*</span>
-        <select
-          value={idUsuario}
-          onChange={(e) => setIdUsuario(e.target.value)}
-          required
-          style={estilosForm.campo}
-        >
-          <option value="" disabled>
-            Selecione um usuário
-          </option>
-          {usuarios.map((usuario) => (
-            <option key={usuario.id_usuario} value={usuario.id_usuario}>
-              {usuario.nome} ({usuario.tipo})
-            </option>
-          ))}
-        </select>
-      </label>
+        <label className="sg-label sg-label-required">
+          Usuario vinculado
+          <select
+            value={idUsuario}
+            onChange={(e) => setIdUsuario(e.target.value)}
+            required
+            className="sg-select"
+          >
+            <option value="" disabled>Selecione um usuario</option>
+            {usuarios.map((usuario) => (
+              <option key={usuario.id_usuario} value={usuario.id_usuario}>
+                {usuario.nome} ({usuario.tipo})
+              </option>
+            ))}
+          </select>
+        </label>
 
-      <label style={estilosForm.rotulo}>
-        Validade (opcional)
-        <input
-          type="date"
-          value={dataValidade}
-          onChange={(e) => setDataValidade(e.target.value)}
-          style={estilosForm.campo}
-        />
-      </label>
+        <label className="sg-label">
+          Validade (opcional)
+          <input
+            type="date"
+            value={dataValidade}
+            onChange={(e) => setDataValidade(e.target.value)}
+            className="sg-input"
+          />
+        </label>
+      </div>
 
-      {erro && <div style={estilosForm.faixaErro}>{erro}</div>}
+      {erro && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erro}</span>
+        </div>
+      )}
 
-      <button type="submit" disabled={salvando} style={estilosForm.botaoSalvar}>
-        {salvando ? 'Salvando...' : 'Vincular'}
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--sg-space-2)' }}>
+        <button type="submit" disabled={salvando} className="sg-btn sg-btn-primary">
+          {salvando ? (
+            <><Spinner tamanho="sm" /> Vinculando...</>
+          ) : (
+            'Vincular cartao'
+          )}
+        </button>
+      </div>
     </form>
   );
 }
-
-const estilos = {
-  pagina: { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
-  cabecalho: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  titulo: { fontSize: '1.4rem' },
-  barraPesquisa: {
-    display: 'flex', alignItems: 'center', gap: '0.55rem',
-    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)', padding: '0.65rem 0.8rem',
-    color: 'var(--cor-texto-suave)',
-  },
-  rotuloPesquisa: { fontSize: '0.82rem', fontWeight: 600, whiteSpace: 'nowrap' },
-  campoPesquisa: {
-    flex: 1, minWidth: 0, border: 'none', outline: 'none',
-    color: 'var(--cor-texto)', background: 'transparent',
-  },
-  botaoPrimario: {
-    display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--cor-blue-600)',
-    color: 'white', border: 'none', padding: '0.6rem 1rem', borderRadius: 'var(--raio-pequeno)',
-    fontWeight: 600, fontSize: '0.9rem',
-  },
-  tabelaContainer: {
-    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)', overflow: 'auto', boxShadow: 'var(--sombra)',
-  },
-  tabela: { width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' },
-  th: {
-    textAlign: 'left', padding: '0.8rem 1rem', borderBottom: '1px solid var(--cor-borda)',
-    color: 'var(--cor-texto-suave)', fontWeight: 600, fontSize: '0.78rem',
-  },
-  td: { padding: '0.7rem 1rem', borderBottom: '1px solid var(--cor-borda)' },
-  botaoIcone: {
-    border: '1px solid var(--cor-borda)', background: 'var(--cor-superficie)',
-    borderRadius: 'var(--raio-pequeno)', padding: '0.35rem', display: 'flex',
-    color: 'var(--cor-texto-suave)',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)', color: 'var(--cor-perigo)',
-    padding: '0.8rem 1rem', borderRadius: 'var(--raio)',
-  },
-};
-
-const estilosForm = {
-  form: { display: 'flex', flexDirection: 'column', gap: '0.9rem' },
-  rotulo: {
-    display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem',
-    fontWeight: 500, color: 'var(--cor-texto-suave)',
-  },
-  campo: {
-    padding: '0.55rem 0.7rem', borderRadius: 'var(--raio-pequeno)',
-    border: '1px solid var(--cor-borda)', fontSize: '0.9rem',
-  },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)', color: 'var(--cor-perigo)',
-    padding: '0.6rem 0.8rem', borderRadius: 'var(--raio-pequeno)', fontSize: '0.85rem',
-  },
-  botaoSalvar: {
-    marginTop: '0.3rem', padding: '0.7rem', borderRadius: 'var(--raio-pequeno)',
-    border: 'none', background: 'var(--cor-blue-600)', color: 'white', fontWeight: 600,
-  },
-};

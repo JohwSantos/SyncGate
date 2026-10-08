@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import api from '../api/client';
 import Badge from '../components/Badge';
 import Paginacao from '../components/Paginacao';
+import Spinner from '../components/Spinner';
+import EstadoVazio from '../components/EstadoVazio';
+import BotoesCSV from '../components/BotoesCSV';
 import { useSocket } from '../hooks/useSocket';
 
 function formatarDataHora(iso) {
@@ -59,13 +62,16 @@ export default function Historico() {
 
   useSocket({
     'novo-acesso': () => {
-      carregar(pagina);
+      // Quando entra novo acesso em tempo real, atualizamos
+      if (pagina === 1) {
+        carregar(1);
+      }
     },
   });
 
   function nomeDoUsuario(idUsuario) {
     if (!idUsuario) return 'Desconhecido';
-    return usuarios.find((u) => u.id_usuario === idUsuario)?.nome || `Usuário #${idUsuario}`;
+    return usuarios.find((u) => u.id_usuario === idUsuario)?.nome || `Usuario #${idUsuario}`;
   }
 
   function descricaoDoDispositivo(idDispositivo) {
@@ -76,48 +82,56 @@ export default function Historico() {
   }
 
   return (
-    <div style={estilos.pagina}>
-      <h1 style={estilos.titulo}>Histórico de Acessos</h1>
+    <div className="sg-page">
+      <div className="sg-page-header">
+        <div className="sg-page-header__left">
+          <h1 className="sg-page-title">Historico de Acessos</h1>
+          <p className="sg-page-subtitle">Acompanhe as entradas e saidas registradas em tempo real</p>
+        </div>
+        <div className="sg-page-actions">
+          <BotoesCSV 
+            rotaExportar="/csv/acesso/exportar" 
+            nomeArquivo="historico_acessos.csv" 
+            rotaImportar={null}
+          />
+        </div>
+      </div>
 
-      <div style={estilos.faixaFiltros}>
-        <label style={estilos.rotuloFiltro}>
-          Usuário
+      <div className="sg-toolbar" style={{ flexWrap: 'wrap' }}>
+        <label className="sg-label" style={{ minWidth: '150px', flex: 1 }}>
+          Usuario
           <select
             value={filtroUsuario}
             onChange={(e) => setFiltroUsuario(e.target.value)}
-            style={estilos.campoFiltro}
+            className="sg-select"
           >
             <option value="todos">Todos</option>
             {usuarios.map((u) => (
-              <option key={u.id_usuario} value={u.id_usuario}>
-                {u.nome}
-              </option>
+              <option key={u.id_usuario} value={u.id_usuario}>{u.nome}</option>
             ))}
           </select>
         </label>
 
-        <label style={estilos.rotuloFiltro}>
+        <label className="sg-label" style={{ minWidth: '150px', flex: 1 }}>
           Dispositivo
           <select
             value={filtroDispositivo}
             onChange={(e) => setFiltroDispositivo(e.target.value)}
-            style={estilos.campoFiltro}
+            className="sg-select"
           >
             <option value="todos">Todos</option>
             {dispositivos.map((d) => (
-              <option key={d.id_dispositivo} value={d.id_dispositivo}>
-                {d.descricao}
-              </option>
+              <option key={d.id_dispositivo} value={d.id_dispositivo}>{d.descricao}</option>
             ))}
           </select>
         </label>
 
-        <label style={estilos.rotuloFiltro}>
+        <label className="sg-label" style={{ minWidth: '120px', flex: 1 }}>
           Status
           <select
             value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value)}
-            style={estilos.campoFiltro}
+            className="sg-select"
           >
             <option value="todos">Todos</option>
             <option value="permitido">Permitido</option>
@@ -125,59 +139,68 @@ export default function Historico() {
           </select>
         </label>
 
-        <label style={estilos.rotuloFiltro}>
-          De
+        <label className="sg-label" style={{ minWidth: '140px', flex: 1 }}>
+          Data Inicial
           <input
             type="date"
             value={dataInicio}
             onChange={(e) => setDataInicio(e.target.value)}
-            style={estilos.campoFiltro}
+            className="sg-input"
           />
         </label>
 
-        <label style={estilos.rotuloFiltro}>
-          Até
+        <label className="sg-label" style={{ minWidth: '140px', flex: 1 }}>
+          Data Final
           <input
             type="date"
             value={dataFim}
             onChange={(e) => setDataFim(e.target.value)}
-            style={estilos.campoFiltro}
+            className="sg-input"
           />
         </label>
       </div>
 
-      {carregando && <p style={{ color: 'var(--cor-texto-suave)' }}>Carregando...</p>}
-      {erro && <div style={estilos.faixaErro}>{erro}</div>}
+      {erro && (
+        <div className="sg-alert sg-alert--error" role="alert">
+          <span>{erro}</span>
+        </div>
+      )}
 
-      {!carregando && !erro && (
-        <div style={estilos.tabelaContainer}>
-          <table style={estilos.tabela} className="sg-tabela-responsiva">
+      {carregando ? (
+        <div className="sg-loading-area">
+          <Spinner /> Buscando historico...
+        </div>
+      ) : !erro ? (
+        <div className="sg-table-wrap">
+          <table className="sg-table sg-table-responsive">
             <thead>
               <tr>
-                <th style={estilos.th}>Data/Hora</th>
-                <th style={estilos.th}>Usuário</th>
-                <th style={estilos.th}>Dispositivo</th>
-                <th style={estilos.th}>Movimento</th>
-                <th style={estilos.th}>Status</th>
-                <th style={estilos.th}>Motivo (se negado)</th>
+                <th>Data/Hora</th>
+                <th>Usuario</th>
+                <th>Dispositivo</th>
+                <th>Movimento</th>
+                <th>Status</th>
+                <th>Motivo (se negado)</th>
               </tr>
             </thead>
             <tbody>
               {acessos.map((acesso) => (
                 <tr key={acesso.id_acesso}>
-                  <td style={{ ...estilos.td, fontFamily: 'var(--fonte-mono)', fontSize: '0.8rem' }} data-rotulo="Data/Hora">
+                  <td className="sg-td-mono" style={{ fontSize: '0.8rem' }} data-rotulo="Data/Hora">
                     {formatarDataHora(acesso.data_hora)}
                   </td>
-                  <td style={estilos.td} data-rotulo="Usuário">{nomeDoUsuario(acesso.id_usuario)}</td>
-                  <td style={estilos.td} data-rotulo="Dispositivo">{descricaoDoDispositivo(acesso.id_dispositivo)}</td>
-                  <td style={{ ...estilos.td, textTransform: 'capitalize' }} data-rotulo="Movimento">{acesso.tipo_movimento}</td>
-                  <td style={estilos.td} data-rotulo="Status">
+                  <td data-rotulo="Usuario"><strong>{nomeDoUsuario(acesso.id_usuario)}</strong></td>
+                  <td data-rotulo="Dispositivo">{descricaoDoDispositivo(acesso.id_dispositivo)}</td>
+                  <td data-rotulo="Movimento" style={{ textTransform: 'capitalize' }}>
+                    {acesso.tipo_movimento}
+                  </td>
+                  <td data-rotulo="Status">
                     <Badge
                       texto={acesso.status === 'permitido' ? 'Permitido' : 'Negado'}
                       tom={acesso.status === 'permitido' ? 'sucesso' : 'perigo'}
                     />
                   </td>
-                  <td style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }} data-rotulo="Motivo">
+                  <td data-rotulo="Motivo" style={{ color: 'var(--sg-text-2)' }}>
                     {acesso.motivo_negado || '—'}
                   </td>
                 </tr>
@@ -185,8 +208,12 @@ export default function Historico() {
 
               {acessos.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ ...estilos.td, color: 'var(--cor-texto-suave)' }}>
-                    Nenhum acesso encontrado com esses filtros.
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    <EstadoVazio 
+                      icone="busca" 
+                      titulo="Nenhum registro encontrado" 
+                      descricao="Nenhum acesso foi registrado com os filtros selecionados." 
+                    />
                   </td>
                 </tr>
               )}
@@ -196,44 +223,10 @@ export default function Historico() {
             pagina={pagina}
             totalPaginas={totalPaginas}
             total={totalRegistros}
-            aoMudar={(novaPagina) => {
-              carregar(novaPagina);
-            }}
+            aoMudar={(novaPagina) => carregar(novaPagina)}
           />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
-
-const estilos = {
-  pagina: { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
-  titulo: { fontSize: '1.4rem' },
-  faixaFiltros: {
-    display: 'flex', flexWrap: 'wrap', gap: '1rem', background: 'var(--cor-superficie)',
-    border: '1px solid var(--cor-borda)', borderRadius: 'var(--raio)', padding: '1rem 1.1rem',
-  },
-  rotuloFiltro: {
-    display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.78rem',
-    fontWeight: 500, color: 'var(--cor-texto-suave)',
-  },
-  campoFiltro: {
-    padding: '0.4rem 0.55rem', borderRadius: 'var(--raio-pequeno)',
-    border: '1px solid var(--cor-borda)', fontSize: '0.85rem', minWidth: '9rem',
-  },
-  tabelaContainer: {
-    background: 'var(--cor-superficie)', border: '1px solid var(--cor-borda)',
-    borderRadius: 'var(--raio)', overflow: 'auto', boxShadow: 'var(--sombra)',
-  },
-  tabela: { width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' },
-  th: {
-    textAlign: 'left', padding: '0.8rem 1rem', borderBottom: '1px solid var(--cor-borda)',
-    color: 'var(--cor-texto-suave)', fontWeight: 600, fontSize: '0.78rem',
-  },
-  td: { padding: '0.65rem 1rem', borderBottom: '1px solid var(--cor-borda)' },
-  faixaErro: {
-    background: 'var(--cor-perigo-fundo)', color: 'var(--cor-perigo)',
-    padding: '0.8rem 1rem', borderRadius: 'var(--raio)',
-  },
-  contagem: { fontSize: '0.8rem', color: 'var(--cor-texto-suave)' },
-};
