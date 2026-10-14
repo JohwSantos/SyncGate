@@ -1,4 +1,4 @@
-# SyncGate — Controle Inteligente de Acesso
+﻿# SyncGate — Controle Inteligente de Acesso
 
 Sistema de controle de acesso físico por RFID, com validação em tempo real, painel administrativo web e histórico de acessos. Desenvolvido como Trabalho de Conclusão de Curso (TCC) da ETEC Zona Leste (Centro Paula Souza).
 
@@ -88,7 +88,7 @@ npm run dev
 - Eventos ao vivo via WebSocket (novo acesso, mudança de status, solicitações)
 - Fluxo de aprovação para visitantes
 - Painel responsivo (desktop, tablet e celular)
-- Importação e Exportação de dados via arquivos CSV (Integração de planilhas/sistemas)
+- Exportação nativa de relatórios do Dashboard em formato PDF`n- Importação e Exportação de dados via arquivos CSV (Integração de planilhas/sistemas)
 - Dashboard com relatórios gerenciais interativos (Diário, Semanal, Mensal, Anual e Top Motivos de Negação)
 - Interface leve e performática com tabelas paginadas
 

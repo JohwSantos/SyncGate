@@ -43,12 +43,7 @@ export default function Sidebar({ aberto, aoNavegar }) {
       aria-label="Menu lateral"
     >
       {/* Marca */}
-      <div className="sg-sidebar-brand">
-        <LogoMarca />
-        <span className="sg-sidebar-wordmark">
-          SYNC<span>GATE</span>
-        </span>
-      </div>
+      <div className="sg-sidebar-brand" style={{ justifyContent: "center" }}><LogoMarca /></div>
 
       {/* Navegacao */}
       <nav className="sg-sidebar-nav" aria-label="Navegacao principal">
@@ -79,30 +74,8 @@ export default function Sidebar({ aberto, aoNavegar }) {
   );
 }
 
-function LogoMarca() {
-  return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 100 100"
-      fill="none"
-      aria-hidden="true"
-      style={{ flexShrink: 0 }}
-    >
-      <path
-        d="M50 6 L88 22 V50 C88 71 71 88 50 94 C29 88 12 71 12 50 V22 Z"
-        fill="rgba(255,255,255,0.10)"
-        stroke="rgba(255,255,255,0.20)"
-        strokeWidth="2"
-      />
-      <path
-        d="M36 36 L64 36 L36 64 L64 64"
-        stroke="#7BA3F5"
-        strokeWidth="9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
+function LogoMarca() { return (<div className="sg-logo-container" style={{ padding: "4px", borderRadius: "var(--sg-radius)", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "85px" }}><img src="/logo.svg" alt="SyncGate" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>); }
+
+
+
+

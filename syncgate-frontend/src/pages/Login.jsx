@@ -33,12 +33,7 @@ export default function Login() {
       {/* Painel esquerdo — identidade */}
       <div style={estilos.painelMarca} className="sg-login-marca">
         <div style={estilos.marcaTopo}>
-          <div style={estilos.logoLinha}>
-            <LogoMarca />
-            <span style={estilos.wordmark}>
-              SYNC<span style={{ color: '#7BA3F5' }}>GATE</span>
-            </span>
-          </div>
+          <div style={estilos.logoLinha}><LogoMarca /></div>
           <p style={estilos.tagline}>Controle de acesso por RFID</p>
         </div>
 
@@ -129,26 +124,7 @@ export default function Login() {
   );
 }
 
-function LogoMarca() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-      <path
-        d="M50 6 L88 22 V50 C88 71 71 88 50 94 C29 88 12 71 12 50 V22 Z"
-        fill="rgba(255,255,255,0.08)"
-        stroke="rgba(255,255,255,0.18)"
-        strokeWidth="2"
-      />
-      <path
-        d="M36 36 L64 36 L36 64 L64 64"
-        stroke="#7BA3F5"
-        strokeWidth="9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
+function LogoMarca() { return (<div className="sg-logo-container" style={{ padding: "8px", borderRadius: "var(--sg-radius)", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "100%", maxWidth: "300px", height: "120px" }}><img src="/logo.svg" alt="SyncGate" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>); }
 
 // Grade decorativa minimalista — evoca "estrutura" e "ordem"
 // sem ser um grafico ou forma abstrata
@@ -175,7 +151,7 @@ function GridDecorativo() {
       style={{ opacity: 0.6 }}
     >
       {pontos.map(({ cx, cy, opacidade }, i) => (
-        <circle key={i} cx={cx} cy={cy} r="2.5" fill="white" opacity={opacidade} />
+        <circle key={i} cx={cx} cy={cy} r="2.5" fill="var(--sg-text-3)" opacity={opacidade} />
       ))}
     </svg>
   );
@@ -213,7 +189,7 @@ const estilos = {
     color: 'white',
   },
   tagline: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'var(--sg-text-2)',
     fontSize: 'var(--sg-text-sm)',
     fontWeight: 400,
   },
@@ -224,7 +200,7 @@ const estilos = {
     flex: 1,
   },
   marcaRodape: {
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--sg-text-3)',
     fontSize: 'var(--sg-text-xs)',
   },
   painelFormulario: {
@@ -275,3 +251,8 @@ const estilos = {
     lineHeight: 1,
   },
 };
+
+
+
+
+

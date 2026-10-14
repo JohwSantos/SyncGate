@@ -10,10 +10,10 @@
    ---------------------------------------------------------------- */
 :root {
   /* Marca */
-  --sg-brand:         #1A47B8;
-  --sg-brand-hover:   #1840A6;
-  --sg-brand-active:  #163892;
-  --sg-brand-subtle:  #EEF2FF;
+  --sg-brand:         #0d53f5;
+  --sg-brand-hover:   #0942c7;
+  --sg-brand-active:  #06319c;
+  --sg-brand-subtle:  #e0e7ff;
   --sg-brand-border:  #C7D2FE;
 
   /* Backgrounds */
@@ -48,12 +48,12 @@
   --sg-info-border:    #BAE6FD;
 
   /* Sidebar */
-  --sg-sidebar-bg:           #172554;
-  --sg-sidebar-text:         rgba(255,255,255,0.6);
-  --sg-sidebar-text-active:  #FFFFFF;
-  --sg-sidebar-active-bg:    rgba(255,255,255,0.10);
-  --sg-sidebar-hover-bg:     rgba(255,255,255,0.06);
-  --sg-sidebar-border:       rgba(255,255,255,0.08);
+  --sg-sidebar-bg:           #FFFFFF;
+  --sg-sidebar-text:         #4B5563;
+  --sg-sidebar-text-active:  var(--sg-brand);
+  --sg-sidebar-active-bg:    var(--sg-brand-subtle);
+  --sg-sidebar-hover-bg:     var(--sg-bg);
+  --sg-sidebar-border:       var(--sg-border);
 
   /* Sombras */
   --sg-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
@@ -98,7 +98,7 @@
   /* Compatibilidade legada */
   --cor-navy-900:      #172554;
   --cor-navy-800:      #1e3a8a;
-  --cor-blue-600:      #1A47B8;
+  --cor-blue-600:      #0d53f5;
   --cor-blue-50:       #EEF2FF;
   --cor-acento-rfid:   #0EA5E9;
   --cor-fundo:         #F3F5F8;
@@ -126,70 +126,51 @@
    2. TOKENS - DARK MODE
    ---------------------------------------------------------------- */
 :root[data-tema='dark'] {
-  --sg-brand:         #4F7CEC;
-  --sg-brand-hover:   #6290F0;
-  --sg-brand-active:  #3A68D8;
-  --sg-brand-subtle:  #1E2D4F;
-  --sg-brand-border:  #3B5AA8;
+  --sg-brand:         #3b82f6;
+  --sg-brand-hover:   #60a5fa;
+  --sg-brand-active:  #2563eb;
+  --sg-brand-subtle:  rgba(59, 130, 246, 0.15);
+  --sg-brand-border:  #1e40af;
 
-  --sg-bg:            #0F1117;
-  --sg-surface:       #181D26;
-  --sg-surface-2:     #1E2433;
+  --sg-bg:            #09090b;
+  --sg-surface:       #18181b;
+  --sg-surface-2:     #27272a;
 
-  --sg-border:        #2A3347;
-  --sg-border-strong: #374159;
+  --sg-border:        #27272a;
+  --sg-border-strong: #3f3f46;
 
-  --sg-text-1:        #F1F5F9;
-  --sg-text-2:        #94A3B8;
-  --sg-text-3:        #5A6A82;
+  --sg-text-1:        #f8fafc;
+  --sg-text-2:        #a1a1aa;
+  --sg-text-3:        #71717a;
 
-  --sg-success:        #4ADE80;
-  --sg-success-bg:     #0D2818;
-  --sg-success-border: #166534;
+  --sg-success:        #22c55e;
+  --sg-success-bg:     #052e16;
+  --sg-success-border: #14532d;
 
-  --sg-warning:        #FCD34D;
-  --sg-warning-bg:     #271C07;
-  --sg-warning-border: #78350F;
+  --sg-warning:        #f59e0b;
+  --sg-warning-bg:     #451a03;
+  --sg-warning-border: #78350f;
 
-  --sg-danger:         #F87171;
-  --sg-danger-bg:      #2D1111;
-  --sg-danger-border:  #7F1D1D;
+  --sg-danger:         #ef4444;
+  --sg-danger-bg:      #450a0a;
+  --sg-danger-border:  #7f1d1d;
 
-  --sg-info:           #38BDF8;
-  --sg-info-bg:        #082036;
-  --sg-info-border:    #0C4A6E;
+  --sg-info:           #0ea5e9;
+  --sg-info-bg:        #082f49;
+  --sg-info-border:    #0c4a6e;
 
-  --sg-sidebar-bg:           #0B0F18;
-  --sg-sidebar-text:         rgba(255,255,255,0.45);
-  --sg-sidebar-text-active:  #FFFFFF;
-  --sg-sidebar-active-bg:    rgba(255,255,255,0.08);
-  --sg-sidebar-hover-bg:     rgba(255,255,255,0.04);
-  --sg-sidebar-border:       rgba(255,255,255,0.06);
+  /* Sidebar */
+  --sg-sidebar-bg:           #09090b;
+  --sg-sidebar-text:         #a1a1aa;
+  --sg-sidebar-text-active:  #ffffff;
+  --sg-sidebar-active-bg:    #27272a;
+  --sg-sidebar-hover-bg:     #18181b;
+  --sg-sidebar-border:       #27272a;
 
-  --sg-shadow-xs: 0 1px 2px rgba(0,0,0,0.25);
-  --sg-shadow-sm: 0 1px 3px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25);
-  --sg-shadow-md: 0 2px 6px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.25);
-  --sg-shadow-lg: 0 4px 16px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.30);
-
-  /* Compatibilidade legada */
-  --cor-navy-900:      #0B0F18;
-  --cor-navy-800:      #111827;
-  --cor-blue-600:      #4F7CEC;
-  --cor-blue-50:       #1E2D4F;
-  --cor-fundo:         #0F1117;
-  --cor-superficie:    #181D26;
-  --cor-borda:         #2A3347;
-  --cor-texto:         #F1F5F9;
-  --cor-texto-suave:   #94A3B8;
-  --cor-sucesso:       #4ADE80;
-  --cor-sucesso-fundo: #0D2818;
-  --cor-perigo:        #F87171;
-  --cor-perigo-fundo:  #2D1111;
-  --cor-alerta:        #FCD34D;
-  --cor-alerta-fundo:  #271C07;
-  --sombra:            var(--sg-shadow-sm);
-
-  color-scheme: dark;
+  --sg-shadow-xs: 0 1px 2px rgba(0,0,0,0.5);
+  --sg-shadow-sm: 0 1px 3px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.4);
+  --sg-shadow-md: 0 4px 6px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5);
+  --sg-shadow-lg: 0 10px 15px rgba(0,0,0,0.8), 0 4px 6px rgba(0,0,0,0.5);
 }
 
 /* ----------------------------------------------------------------
@@ -993,3 +974,16 @@ input, select, textarea {
     --sg-text-3: #64748b;
   }
 }
+
+
+
+.sg-logo-container {
+  background: transparent;
+  transition: all 0.2s ease;
+}
+:root[data-tema='dark'] .sg-logo-container {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 4px 6px rgba(0,0,0,0.3);
+}
+
