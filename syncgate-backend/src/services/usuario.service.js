@@ -18,6 +18,46 @@ function erroComStatus(mensagem, status) {
 const TIPOS_VALIDOS = ['aluno', 'professor', 'funcionario', 'admin'];
 const PERFIS_VALIDOS = ['operador', 'gestor', 'master'];
 
+// Perfis "poderosos": só um master pode entregar esses perfis a
+// alguém. Sem essa regra, um gestor conseguiria criar (ou se
+// transformar em) um master — a chamada "escalada de privilégio".
+const PERFIS_RESTRITOS = ['gestor', 'master'];
+
+// ------------------------------------------------------------
+// Regras de autorização (quem pode fazer o quê com quem)
+// ------------------------------------------------------------
+// `quemFaz` é o usuário logado (req.usuarioLogado, vindo do token).
+// Quando ele é `null`, a chamada veio de dentro do próprio sistema
+// (ex.: o script criarAdmin.js, rodado no terminal do servidor),
+// e por isso não há restrição de perfil.
+
+// Confere se `quemFaz` pode dar o perfil `perfil` a alguém.
+function verificarPodeAtribuirPerfil(quemFaz, perfil) {
+  if (!quemFaz) return;
+  if (PERFIS_RESTRITOS.includes(perfil) && quemFaz.perfil !== 'master') {
+    throw erroComStatus('Somente um master pode atribuir os perfis gestor ou master', 403);
+  }
+}
+
+// Confere se `quemFaz` pode mexer no usuário `alvo` (editar,
+// bloquear, excluir). Um gestor não pode mexer em um master.
+function verificarPodeGerenciar(quemFaz, alvo) {
+  if (!quemFaz) return;
+  if (alvo.perfil === 'master' && quemFaz.perfil !== 'master') {
+    throw erroComStatus('Somente um master pode alterar um usuário master', 403);
+  }
+}
+
+// Ninguém pode bloquear, excluir ou trocar o próprio perfil:
+// evita que alguém se tranque fora do sistema por engano.
+function ehOProprio(quemFaz, idAlvo) {
+  return !!quemFaz && Number(quemFaz.id_usuario) === Number(idAlvo);
+}
+
+// ------------------------------------------------------------
+// Operações
+// ------------------------------------------------------------
+
 async function listar() {
   return usuarioModel.listarTodos();
 }
@@ -34,7 +74,7 @@ async function buscarPorId(id) {
   return usuario;
 }
 
-async function criar(dados) {
+async function criar(dados, quemFaz = null) {
   const { nome, cpf, tipo, login, senha, perfil } = dados;
 
   // Validação dos campos obrigatórios (RF07)
@@ -53,6 +93,8 @@ async function criar(dados) {
     throw erroComStatus(`perfil deve ser um de: ${PERFIS_VALIDOS.join(', ')}`, 400);
   }
 
+  verificarPodeAtribuirPerfil(quemFaz, perfil);
+
   // RN05 / regra de negócio: não permitir CPF duplicado.
   // Verificamos aqui, antes do INSERT, para devolver uma mensagem
   // clara (409 Conflict) em vez de um erro genérico de banco.
@@ -66,27 +108,55 @@ async function criar(dados) {
   // e mais seguro; 10 é um valor padrão razoável).
   const senha_hash = await bcrypt.hash(senha, 10);
 
-  return usuarioModel.criar({ ...dados, senha_hash });
+  return usuarioModel.criar({ ...dados, perfil: perfil || null, senha_hash });
 }
 
-async function atualizar(id, dados) {
+async function atualizar(id, dados, quemFaz = null) {
   // Garante que o usuário existe antes de tentar atualizar
   // (se não existir, buscarPorId já lança erro 404)
-  await buscarPorId(id);
+  const alvo = await buscarPorId(id);
 
-  if (dados.perfil && !PERFIS_VALIDOS.includes(dados.perfil)) {
-    throw erroComStatus(`perfil deve ser um de: ${PERFIS_VALIDOS.join(', ')}`, 400);
+  verificarPodeGerenciar(quemFaz, alvo);
+
+  // Só tratamos o perfil se ele veio na requisição E mudou.
+  // `perfil: null` (ou "") significa "remover o acesso ao painel".
+  if (dados.perfil !== undefined) {
+    const novoPerfil = dados.perfil || null;
+
+    if (novoPerfil && !PERFIS_VALIDOS.includes(novoPerfil)) {
+      throw erroComStatus(`perfil deve ser um de: ${PERFIS_VALIDOS.join(', ')}`, 400);
+    }
+
+    if (novoPerfil !== alvo.perfil) {
+      if (ehOProprio(quemFaz, id)) {
+        throw erroComStatus('Você não pode alterar o seu próprio perfil', 403);
+      }
+      verificarPodeAtribuirPerfil(quemFaz, novoPerfil);
+    }
+
+    dados = { ...dados, perfil: novoPerfil };
+  }
+
+  // Se o nome foi enviado, ele não pode ficar vazio.
+  if (dados.nome !== undefined && !String(dados.nome).trim()) {
+    throw erroComStatus('O nome não pode ficar vazio', 400);
   }
 
   return usuarioModel.atualizar(id, dados);
 }
 
 // RF09: bloquear ou desbloquear, sem apagar o cadastro
-async function definirStatus(id, ativo) {
-  await buscarPorId(id);
+async function definirStatus(id, ativo, quemFaz = null) {
+  const alvo = await buscarPorId(id);
 
   if (typeof ativo !== 'boolean') {
     throw erroComStatus('O campo "ativo" deve ser true ou false', 400);
+  }
+
+  verificarPodeGerenciar(quemFaz, alvo);
+
+  if (!ativo && ehOProprio(quemFaz, id)) {
+    throw erroComStatus('Você não pode bloquear a si mesmo', 403);
   }
 
   return usuarioModel.definirStatus(id, ativo);
@@ -97,8 +167,14 @@ async function definirStatus(id, ativo) {
 // dele (cartões, solicitações) — o próprio banco garante isso via
 // chave estrangeira; aqui só traduzimos o erro do banco em algo
 // que faça sentido para quem está usando o painel.
-async function remover(id) {
-  await buscarPorId(id); // garante que existe (senão, 404)
+async function remover(id, quemFaz = null) {
+  const alvo = await buscarPorId(id); // garante que existe (senão, 404)
+
+  verificarPodeGerenciar(quemFaz, alvo);
+
+  if (ehOProprio(quemFaz, id)) {
+    throw erroComStatus('Você não pode excluir a si mesmo', 403);
+  }
 
   try {
     await usuarioModel.remover(id);

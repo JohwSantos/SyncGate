@@ -6,6 +6,10 @@ const usuarioService = require('../services/usuario.service');
 //
 // Todo erro é repassado para o next(erro), que cai no
 // errorHandler (middleware central de erros).
+//
+// req.usuarioLogado (preenchido pelo verificarToken) é repassado
+// ao service para ele saber QUEM está fazendo a ação — é assim que
+// ele impede, por exemplo, que um gestor crie um usuário master.
 
 async function listar(req, res, next) {
   try {
@@ -41,7 +45,7 @@ async function buscarPorId(req, res, next) {
 
 async function criar(req, res, next) {
   try {
-    const novoUsuario = await usuarioService.criar(req.body);
+    const novoUsuario = await usuarioService.criar(req.body, req.usuarioLogado);
     res.status(201).json(novoUsuario);
   } catch (erro) {
     next(erro);
@@ -50,7 +54,7 @@ async function criar(req, res, next) {
 
 async function atualizar(req, res, next) {
   try {
-    const usuarioAtualizado = await usuarioService.atualizar(req.params.id, req.body);
+    const usuarioAtualizado = await usuarioService.atualizar(req.params.id, req.body, req.usuarioLogado);
     res.json(usuarioAtualizado);
   } catch (erro) {
     next(erro);
@@ -59,7 +63,11 @@ async function atualizar(req, res, next) {
 
 async function definirStatus(req, res, next) {
   try {
-    const usuarioAtualizado = await usuarioService.definirStatus(req.params.id, req.body.ativo);
+    const usuarioAtualizado = await usuarioService.definirStatus(
+      req.params.id,
+      req.body.ativo,
+      req.usuarioLogado
+    );
     res.json(usuarioAtualizado);
   } catch (erro) {
     next(erro);
@@ -68,7 +76,7 @@ async function definirStatus(req, res, next) {
 
 async function remover(req, res, next) {
   try {
-    await usuarioService.remover(req.params.id);
+    await usuarioService.remover(req.params.id, req.usuarioLogado);
     res.status(204).send();
   } catch (erro) {
     next(erro);

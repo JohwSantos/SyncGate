@@ -13,5 +13,6 @@ export function usePermissoes() {
     podeGerenciarCartoesDispositivos: temPermissao(perfil, PERMISSOES.cartoesDispositivos),
     podeGerenciarHorarios: temPermissao(perfil, PERMISSOES.horarios),
     podeAprovarSolicitacoes: temPermissao(perfil, PERMISSOES.aprovarSolicitacoes),
+    podeAtribuirPerfisRestritos: temPermissao(perfil, PERMISSOES.atribuirPerfisRestritos),
   };
 }

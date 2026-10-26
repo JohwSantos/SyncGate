@@ -56,7 +56,7 @@ async function importarUsuarios(req, res, next) {
     if (!req.file) {
       return res.status(400).json({ erro: 'Nenhum arquivo enviado' });
     }
-    const resultado = await csvService.importarUsuarios(req.file.buffer);
+    const resultado = await csvService.importarUsuarios(req.file.buffer, req.usuarioLogado);
     res.json(resultado);
   } catch (erro) {
     next(erro);

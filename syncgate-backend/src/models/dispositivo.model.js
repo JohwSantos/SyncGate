@@ -42,14 +42,24 @@ async function criar(dados) {
   return buscarPorId(resultado.insertId);
 }
 
-async function atualizar(idDispositivo, dados) {
-  const { descricao, localizacao, ip_local } = dados;
+// Campos que podem ser alterados pela edição (status tem rota própria).
+const CAMPOS_EDITAVEIS = ['descricao', 'localizacao', 'ip_local'];
 
-  await pool.query(
-    `UPDATE dispositivos SET descricao = ?, localizacao = ?, ip_local = ?
-     WHERE id_dispositivo = ?`,
-    [descricao, localizacao, ip_local, idDispositivo]
-  );
+// Atualização PARCIAL: só os campos enviados entram no UPDATE,
+// para que um campo ausente não seja apagado (gravado como NULL).
+async function atualizar(idDispositivo, dados) {
+  const campos = CAMPOS_EDITAVEIS.filter((campo) => dados[campo] !== undefined);
+
+  if (campos.length > 0) {
+    // Nomes de coluna vêm da lista fixa acima; valores vão como parâmetros (?).
+    const set = campos.map((campo) => `${campo} = ?`).join(', ');
+    const valores = campos.map((campo) => dados[campo]);
+
+    await pool.query(
+      `UPDATE dispositivos SET ${set} WHERE id_dispositivo = ?`,
+      [...valores, idDispositivo]
+    );
+  }
 
   return buscarPorId(idDispositivo);
 }

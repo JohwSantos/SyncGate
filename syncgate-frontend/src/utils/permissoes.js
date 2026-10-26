@@ -8,6 +8,8 @@ export const PERMISSOES = {
   cartoesDispositivos: ['master'],
   horarios: ['gestor', 'master'],
   aprovarSolicitacoes: ['gestor', 'master'],
+  // Só um master pode dar os perfis gestor/master a alguém
+  atribuirPerfisRestritos: ['master'],
 };
 
 export function temPermissao(perfil, permissoesNecessarias) {

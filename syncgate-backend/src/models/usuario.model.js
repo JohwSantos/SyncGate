@@ -86,18 +86,31 @@ async function criar(dados) {
   return buscarPorId(resultado.insertId);
 }
 
-async function atualizar(idUsuario, dados) {
-  const {
-    nome, matricula, email, telefone, curso, turma, cargo, perfil,
-  } = dados;
+// Campos que podem ser alterados pela edição. CPF, login, tipo,
+// senha e status ficam de fora de propósito (status tem rota própria).
+const CAMPOS_EDITAVEIS = [
+  'nome', 'matricula', 'email', 'telefone', 'curso', 'turma', 'cargo', 'perfil',
+];
 
-  await pool.query(
-    `UPDATE usuarios SET
-      nome = ?, matricula = ?, email = ?, telefone = ?,
-      curso = ?, turma = ?, cargo = ?, perfil = ?
-     WHERE id_usuario = ?`,
-    [nome, matricula, email, telefone, curso, turma, cargo, perfil, idUsuario]
-  );
+// Atualização PARCIAL: só entram no UPDATE os campos que vieram
+// em `dados`. Antes, um campo ausente virava `undefined`, que o
+// mysql2 grava como NULL — ou seja, um PUT só com { nome } apagava
+// email, telefone e até o perfil do usuário.
+async function atualizar(idUsuario, dados) {
+  const campos = CAMPOS_EDITAVEIS.filter((campo) => dados[campo] !== undefined);
+
+  if (campos.length > 0) {
+    // Os nomes das colunas vêm da lista fixa acima (nunca do
+    // usuário), então montar o SET assim é seguro. Os VALORES
+    // continuam indo como parâmetros (?), protegidos contra SQL Injection.
+    const set = campos.map((campo) => `${campo} = ?`).join(', ');
+    const valores = campos.map((campo) => dados[campo]);
+
+    await pool.query(
+      `UPDATE usuarios SET ${set} WHERE id_usuario = ?`,
+      [...valores, idUsuario]
+    );
+  }
 
   return buscarPorId(idUsuario);
 }

@@ -1,8 +1,8 @@
 const { stringify } = require('csv-stringify/sync');
 const { parse } = require('csv-parse/sync');
-const bcrypt = require('bcryptjs');
 const { pool } = require('../config/database');
 const usuarioModel = require('../models/usuario.model');
+const usuarioService = require('../services/usuario.service');
 const cartaoModel = require('../models/cartao.model');
 const dispositivoModel = require('../models/dispositivo.model');
 
@@ -98,7 +98,12 @@ async function exportarHistorico() {
 // Importa usuários a partir de CSV.
 // Campos obrigatórios no CSV: nome, cpf, tipo, login, senha.
 // Linhas cujo CPF já existe no banco são puladas.
-async function importarUsuarios(buffer) {
+//
+// Cada linha passa pelo MESMO usuarioService.criar() do cadastro
+// pelo painel — assim valem as mesmas regras (tipo válido, perfil
+// válido, e só um master pode criar gestor/master). Antes, o CSV
+// gravava direto no model e pulava todas essas validações.
+async function importarUsuarios(buffer, quemFaz) {
   const registros = parse(buffer, {
     columns: true,        // usa a primeira linha como cabeçalho
     skip_empty_lines: true,
@@ -128,21 +133,23 @@ async function importarUsuarios(buffer) {
     }
 
     try {
-      const senha_hash = await bcrypt.hash(reg.senha, 10);
-      await usuarioModel.criar({
-        nome: reg.nome,
-        cpf: reg.cpf,
-        matricula: reg.matricula || null,
-        tipo: reg.tipo,
-        email: reg.email || null,
-        telefone: reg.telefone || null,
-        curso: reg.curso || null,
-        turma: reg.turma || null,
-        cargo: reg.cargo || null,
-        login: reg.login,
-        senha_hash,
-        perfil: reg.perfil || null,
-      });
+      await usuarioService.criar(
+        {
+          nome: reg.nome,
+          cpf: reg.cpf,
+          matricula: reg.matricula || null,
+          tipo: reg.tipo,
+          email: reg.email || null,
+          telefone: reg.telefone || null,
+          curso: reg.curso || null,
+          turma: reg.turma || null,
+          cargo: reg.cargo || null,
+          login: reg.login,
+          senha: reg.senha,
+          perfil: reg.perfil || null,
+        },
+        quemFaz
+      );
       resultados.inseridos++;
     } catch (erro) {
       resultados.erros.push(`Linha ${linha}: ${erro.message}`);

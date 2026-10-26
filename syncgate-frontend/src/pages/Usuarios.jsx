@@ -247,6 +247,15 @@ export default function Usuarios() {
 }
 function FormularioUsuario({ usuarioInicial, aoSalvar }) {
   const emEdicao = !!usuarioInicial.id_usuario;
+  const { podeAtribuirPerfisRestritos } = usePermissoes();
+
+  // Um gestor só pode dar o perfil "operador". O perfil atual do
+  // usuário editado continua na lista para aparecer selecionado
+  // (mantê-lo é permitido; o backend só barra a MUDANÇA).
+  const perfisDisponiveis = PERFIS.filter(
+    (perfil) =>
+      podeAtribuirPerfisRestritos || perfil === 'operador' || perfil === usuarioInicial.perfil
+  );
 
   const [dados, setDados] = useState({
     nome: usuarioInicial.nome || '',
@@ -396,7 +405,7 @@ function FormularioUsuario({ usuarioInicial, aoSalvar }) {
               style={{ textTransform: 'capitalize' }}
             >
               <option value="">Nenhum (nao acessa o painel)</option>
-              {PERFIS.map((perfil) => (
+              {perfisDisponiveis.map((perfil) => (
                 <option key={perfil} value={perfil}>{perfil}</option>
               ))}
             </select>

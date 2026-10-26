@@ -42,8 +42,10 @@ async function criar(dados) {
 async function atualizar(id, dados) {
   await buscarPorId(id); // garante que existe (senão, 404)
 
-  if (!dados.descricao) {
-    throw erroComStatus('Campo obrigatório: descricao', 400);
+  // A edição é parcial: a descrição só é obrigatória se for
+  // enviada — nesse caso, não pode vir vazia.
+  if (dados.descricao !== undefined && !String(dados.descricao).trim()) {
+    throw erroComStatus('A descrição não pode ficar vazia', 400);
   }
 
   return dispositivoModel.atualizar(id, dados);
