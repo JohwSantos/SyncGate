@@ -3,9 +3,17 @@ const { pool } = require('../config/database');
 // Model de dispositivos (catracas/leitores RFID).
 // Só lê e escreve na tabela `dispositivos` — sem regras de negócio.
 
+// Colunas devolvidas pelas consultas. O chave_api_hash fica de
+// fora de propósito (mesma ideia do senha_hash dos usuários):
+// o painel só precisa saber SE existe chave, e não o hash dela.
+const COLUNAS = `
+  id_dispositivo, descricao, localizacao, ip_local, status,
+  ultima_comunicacao, (chave_api_hash IS NOT NULL) AS tem_chave
+`;
+
 async function listarTodos() {
   const [linhas] = await pool.query(
-    `SELECT * FROM dispositivos ORDER BY id_dispositivo`
+    `SELECT ${COLUNAS} FROM dispositivos ORDER BY id_dispositivo`
   );
   return linhas;
 }
@@ -16,7 +24,7 @@ async function listarPaginado(pagina = 1, limite = 10) {
     `SELECT COUNT(*) AS total FROM dispositivos`
   );
   const [linhas] = await pool.query(
-    `SELECT * FROM dispositivos ORDER BY id_dispositivo LIMIT ? OFFSET ?`,
+    `SELECT ${COLUNAS} FROM dispositivos ORDER BY id_dispositivo LIMIT ? OFFSET ?`,
     [limite, offset]
   );
   return { dados: linhas, total };
@@ -24,7 +32,7 @@ async function listarPaginado(pagina = 1, limite = 10) {
 
 async function buscarPorId(idDispositivo) {
   const [linhas] = await pool.query(
-    `SELECT * FROM dispositivos WHERE id_dispositivo = ?`,
+    `SELECT ${COLUNAS} FROM dispositivos WHERE id_dispositivo = ?`,
     [idDispositivo]
   );
   return linhas[0] || null;
@@ -77,6 +85,25 @@ async function atualizarStatus(idDispositivo, status) {
   return buscarPorId(idDispositivo);
 }
 
+// Única função que lê o hash da chave — usada só para autenticar
+// o dispositivo (middleware autenticarDispositivo).
+async function buscarHashDaChave(idDispositivo) {
+  const [linhas] = await pool.query(
+    `SELECT chave_api_hash FROM dispositivos WHERE id_dispositivo = ?`,
+    [idDispositivo]
+  );
+  return linhas[0] ? linhas[0].chave_api_hash : null;
+}
+
+// Grava o hash de uma chave nova (a antiga deixa de funcionar).
+async function definirHashDaChave(idDispositivo, hash) {
+  await pool.query(
+    `UPDATE dispositivos SET chave_api_hash = ? WHERE id_dispositivo = ?`,
+    [hash, idDispositivo]
+  );
+  return buscarPorId(idDispositivo);
+}
+
 async function remover(idDispositivo) {
   await pool.query(`DELETE FROM dispositivos WHERE id_dispositivo = ?`, [idDispositivo]);
 }
@@ -88,5 +115,7 @@ module.exports = {
   criar,
   atualizar,
   atualizarStatus,
+  buscarHashDaChave,
+  definirHashDaChave,
   remover,
 };

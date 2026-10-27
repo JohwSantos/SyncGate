@@ -63,7 +63,13 @@ CREATE TABLE dispositivos (
   localizacao         VARCHAR(100) NULL,
   ip_local            VARCHAR(45)  NULL,
   status              ENUM('online', 'offline', 'manutencao') NOT NULL DEFAULT 'offline',
-  ultima_comunicacao  DATETIME NULL
+  ultima_comunicacao  DATETIME NULL,
+
+  -- Hash (SHA-256) da chave secreta que o ESP32 usa para se
+  -- identificar na API. A chave em si nunca é guardada: ela só é
+  -- mostrada uma vez, no momento em que é gerada pelo painel.
+  -- NULL = dispositivo ainda sem chave (não consegue validar acessos).
+  chave_api_hash      CHAR(64) NULL
 ) ENGINE=InnoDB;
 
 

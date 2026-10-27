@@ -16,6 +16,7 @@ router.get('/:id', dispositivoController.buscarPorId);
 router.post('/', permitirPerfil('master'), dispositivoController.criar);
 router.put('/:id', permitirPerfil('master'), dispositivoController.atualizar);
 router.patch('/:id/status', permitirPerfil('master'), dispositivoController.atualizarStatus);
+router.post('/:id/chave', permitirPerfil('master'), dispositivoController.gerarChave);
 router.delete('/:id', permitirPerfil('master'), dispositivoController.remover);
 
 module.exports = router;

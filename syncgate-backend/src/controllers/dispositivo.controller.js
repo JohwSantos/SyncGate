@@ -58,11 +58,24 @@ async function remover(req, res, next) {
   }
 }
 
+async function gerarChave(req, res, next) {
+  try {
+    const resultado = await dispositivoService.gerarChave(req.params.id);
+    res.status(201).json({
+      ...resultado,
+      aviso: 'Copie a chave agora: ela não será mostrada novamente.',
+    });
+  } catch (erro) {
+    next(erro);
+  }
+}
+
 module.exports = {
   listar,
   buscarPorId,
   criar,
   atualizar,
   atualizarStatus,
+  gerarChave,
   remover,
 };

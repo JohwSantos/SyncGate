@@ -111,6 +111,16 @@ async function validarAcesso({ uid, id_dispositivo }) {
     throw erroComStatus('Campos obrigatórios: uid, id_dispositivo', 400);
   }
 
+  // O UID de um cartão RFID é um número em hexadecimal (ex.:
+  // "A1B2C3D4"). Aceitamos letras, números e ":" "-" "_" (alguns
+  // leitores separam os bytes assim), com até 32 caracteres. Isso
+  // impede que alguém mande um texto gigante ou estranho, que iria
+  // parar no motivo_negado do histórico e no painel.
+  uid = String(uid).trim();
+  if (!/^[A-Za-z0-9:_-]{1,32}$/.test(uid)) {
+    throw erroComStatus('UID inválido: use até 32 caracteres (letras, números, ":", "-" ou "_")', 400);
+  }
+
   // 1. Dispositivo precisa existir. Se não existir, não registramos
   // nada (decisão do projeto): não dá pra logar um acesso "órfão".
   const dispositivo = await dispositivoModel.buscarPorId(id_dispositivo);

@@ -6,7 +6,17 @@ const acessoService = require('../services/acesso.service');
 async function validar(req, res, next) {
   try {
     const resultado = await acessoService.validarAcesso(req.body);
-    res.json(resultado);
+
+    // Resposta MÍNIMA para o dispositivo: só o que ele precisa para
+    // decidir (liberar ou não, e acender o LED certo). Antes também
+    // devolvíamos o nome e o tipo da pessoa — qualquer um na rede que
+    // testasse UIDs descobriria de quem é cada cartão. O painel
+    // continua recebendo os detalhes completos pelo WebSocket.
+    res.json({
+      permitido: resultado.permitido,
+      tipo_movimento: resultado.registro.tipo_movimento,
+      motivo: resultado.permitido ? null : resultado.motivo,
+    });
   } catch (erro) {
     next(erro);
   }

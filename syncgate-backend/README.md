@@ -56,6 +56,7 @@ mysql -u root < database/schema.sql
 
 ```bash
 mysql -u root syncgate < database/migracoes/002_login_unico.sql
+mysql -u root syncgate < database/migracoes/003_chave_dispositivo.sql
 ```
 
 O sistema trabalha sempre no horário de Brasília, mesmo que o servidor esteja em outro fuso (como o Docker, que usa UTC). Isso é configurado por `APP_TIMEZONE` e `DB_TIMEZONE` no `.env`.
@@ -109,7 +110,19 @@ npm run seed:admin -- "Seu Nome" "12345678900" "admin" "suaSenha123"
 
 ## Autenticação
 
-Todas as rotas administrativas exigem `Authorization: Bearer <token>`, obtido em `POST /api/auth/login`. A única rota pública além do login é `POST /api/acesso/validar` — é a rota que o dispositivo físico (ESP32) chama, não uma pessoa logada no painel.
+Todas as rotas administrativas exigem `Authorization: Bearer <token>`, obtido em `POST /api/auth/login`. A rota `POST /api/acesso/validar` é chamada pelo dispositivo físico (ESP32), não por uma pessoa logada — por isso ela não usa o token de login, e sim a **chave do dispositivo**:
+
+```http
+POST /api/acesso/validar
+Content-Type: application/json
+X-Dispositivo-Chave: <chave de 64 caracteres>
+
+{ "uid": "A1B2C3D4", "id_dispositivo": 1 }
+```
+
+A chave é gerada no painel (Dispositivos → botão da chave) ou por `POST /api/dispositivos/:id/chave` (master). Ela é mostrada **uma única vez**; o banco guarda só o hash SHA-256. Sem chave, com chave errada ou com um dispositivo inexistente, a resposta é `401`. A resposta de sucesso é mínima — `{ "permitido": true, "tipo_movimento": "entrada", "motivo": null }` —; os detalhes (nome, tipo) vão só para o painel, pelo WebSocket.
+
+**Limites de requisição (rate limit):** login — 10 tentativas erradas a cada 15 minutos por IP + login (`429` depois disso); validação de acesso — 60 leituras por minuto por dispositivo (só leituras com chave válida contam).
 
 ## Exclusão (DELETE)
 
@@ -121,10 +134,11 @@ Todas as rotas administrativas exigem `Authorization: Bearer <token>`, obtido em
 |---|---|---|
 | GET | `/api/health` | — |
 | POST | `/api/auth/login` | — |
-| POST | `/api/acesso/validar` | — (rota do dispositivo) |
+| POST | `/api/acesso/validar` | Chave do dispositivo (`X-Dispositivo-Chave`) |
 | GET/POST/PUT/PATCH/DELETE | `/api/usuarios` | Bearer |
 | GET/POST/PATCH/DELETE | `/api/cartoes` | Bearer |
 | GET/POST/PUT/PATCH/DELETE | `/api/dispositivos` | Bearer |
+| POST | `/api/dispositivos/:id/chave` | Bearer (master) |
 | GET/POST/DELETE | `/api/horarios` | Bearer |
 | GET/POST/PATCH | `/api/solicitacoes` | Bearer |
 | GET | `/api/acesso` | Bearer |

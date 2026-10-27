@@ -25,6 +25,7 @@ Dispositivo (ESP32 + leitor RFID)
 syncgate/
 ├── syncgate-backend/     # API REST (Node.js + Express + MySQL)
 ├── syncgate-frontend/    # Painel administrativo (React + Vite)
+├── syncgate-firmware/    # Código do leitor (ESP32 + RC522, Arduino IDE)
 └── docker-compose.yml    # Sobe tudo junto (banco + API + painel)
 ```
 

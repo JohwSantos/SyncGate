@@ -1,5 +1,6 @@
 const dispositivoModel = require('../models/dispositivo.model');
 const websocket = require('../websocket/socket');
+const chaveDispositivo = require('../utils/chaveDispositivo');
 
 function erroComStatus(mensagem, status) {
   const erro = new Error(mensagem);
@@ -68,6 +69,23 @@ async function atualizarStatus(id, status) {
   return dispositivo;
 }
 
+// Gera uma chave nova para o dispositivo e devolve a chave em texto
+// — é a ÚNICA vez que ela aparece. No banco fica só o hash. Gerar
+// de novo invalida a chave anterior (útil se ela vazar).
+async function gerarChave(id) {
+  await buscarPorId(id); // garante que existe (senão, 404)
+
+  const chave = chaveDispositivo.gerarChave();
+  const dispositivo = await dispositivoModel.definirHashDaChave(
+    id,
+    chaveDispositivo.calcularHash(chave)
+  );
+
+  websocket.emitir('dispositivo-atualizado', dispositivo);
+
+  return { dispositivo, chave };
+}
+
 // Um dispositivo só pode ser excluído se nunca tiver aparecido em
 // nenhum registro de acesso (a coluna acesso.id_dispositivo é
 // obrigatória, então o banco recusa a exclusão nesse caso — é o
@@ -97,5 +115,6 @@ module.exports = {
   criar,
   atualizar,
   atualizarStatus,
+  gerarChave,
   remover,
 };
