@@ -35,4 +35,14 @@ module.exports = {
   //   horário de verão desde 2019, então -03:00 é fixo.
   timezone: process.env.APP_TIMEZONE || 'America/Sao_Paulo',
   dbTimezone: process.env.DB_TIMEZONE || '-03:00',
+
+  // Quantos "proxies" existem entre a internet e a API.
+  // Na Azure (App Service / Container Apps), toda requisição passa
+  // por um balanceador antes de chegar no container — sem avisar o
+  // Express, ele acharia que TODO MUNDO tem o IP do balanceador, e o
+  // rate limit do login bloquearia todos juntos. Com TRUST_PROXY=1,
+  // o Express usa o IP real do cliente (cabeçalho X-Forwarded-For).
+  // Rodando direto no PC (sem proxy), deixe 0 — confiar num proxy
+  // que não existe deixaria qualquer um "inventar" o próprio IP.
+  trustProxy: Number(process.env.TRUST_PROXY) || 0,
 };

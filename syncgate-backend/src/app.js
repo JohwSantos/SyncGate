@@ -2,9 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
 const errorHandler = require('./middlewares/errorHandler');
+const env = require('./config/env');
 
 // Cria a aplicação Express
 const app = express();
+
+// Atrás de um proxy (ex.: Azure), usa o IP real do cliente.
+// Ver TRUST_PROXY em config/env.js.
+if (env.trustProxy > 0) {
+  app.set('trust proxy', env.trustProxy);
+}
 
 // Permite que o painel React (rodando em outra porta/origem)
 // consiga fazer requisições para esta API.

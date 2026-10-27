@@ -5,28 +5,34 @@
 //    (na mesma pasta do syncgate-firmware.ino).
 // 2. Preencha os valores abaixo.
 //
-// O config.h tem a senha do Wi-Fi e a chave do dispositivo, por
-// isso ele está no .gitignore e NUNCA vai para o GitHub. Este
-// arquivo de modelo (sem segredos) é o que fica no repositório.
+// Estes valores são só o PADRÃO DE FÁBRICA. Depois de gravado,
+// o ESP32 pode ser configurado pelo celular (página de
+// configuração), sem reprogramar — e o que for salvo lá passa a
+// valer no lugar daqui. Veja o README.md desta pasta.
+//
+// O config.h está no .gitignore e NUNCA vai para o GitHub
+// (pode conter a chave do dispositivo).
 // ============================================================
 
 #pragma once
 
-// ---- Wi-Fi ---------------------------------------------------
-// O ESP32 só conecta em redes de 2,4 GHz (não funciona em 5 GHz).
-#define WIFI_SSID   "EL_DESTILADOS"
-#define WIFI_SENHA  "eldestilados123"
+// ---- Endereço padrão da API ----------------------------------
+// Na Azure, use o endereço público do backend (com https://), ex.:
+//   "https://syncgate-api.azurewebsites.net/api/acesso/validar"
+// Para testar com o backend no seu PC, use o IP dele com http://
+// (não "localhost" — para o ESP32, localhost é ele mesmo), ex.:
+//   "http://192.168.0.15:3000/api/acesso/validar"
+#define API_URL_PADRAO  "https://SEU-APP.azurewebsites.net/api/acesso/validar"
 
-// ---- API do SyncGate -----------------------------------------
-// Use o IP do computador onde o backend está rodando, NÃO
-// "localhost" (para o ESP32, localhost é ele mesmo).
-// Para descobrir o IP no Windows: abra o PowerShell e rode
-//   ipconfig
-// e procure "Endereço IPv4" do adaptador Wi-Fi (ex.: 192.168.0.15).
-#define API_URL  "http://192.168.15.7:3000/api/acesso/validar"
-
-// ---- Identificação do dispositivo ----------------------------
+// ---- Identificação padrão do dispositivo ---------------------
 // No painel: Dispositivos → botão da chave (🔑) → "Gerar chave".
-// O painel mostra exatamente estas duas linhas prontas para colar.
-#define ID_DISPOSITIVO     1
-#define CHAVE_DISPOSITIVO  "a3fb27edaf3b9e9ef1dbd9e976a46b25a005104ac2d098e367cbf9fe5ea24b5d"
+// Pode deixar 0 e "" aqui e preencher pela página de configuração.
+#define ID_DISPOSITIVO_PADRAO     0
+#define CHAVE_DISPOSITIVO_PADRAO  ""
+
+// ---- Senha da rede de configuração ---------------------------
+// Sem Wi-Fi salvo, o ESP32 cria a rede "SyncGate-XXXX" para você
+// configurá-lo pelo celular. Esta é a senha dessa rede, para que
+// ninguém por perto mude a configuração da catraca.
+// Mínimo de 8 caracteres. TROQUE antes de instalar a catraca.
+#define SENHA_PORTAL  "syncgate123"

@@ -2,11 +2,12 @@
 // SyncGate — Firmware do leitor de acesso (ESP32 + RC522)
 // ============================================================
 // O que este programa faz, em resumo:
-//   1. Conecta no Wi-Fi.
+//   1. Conecta no Wi-Fi (configurado pelo celular, sem reprogramar).
 //   2. Fica esperando um cartão RFID encostar no leitor RC522.
 //   3. Lê o UID do cartão (o "número de série" dele).
 //   4. Envia o UID para a API do SyncGate (/api/acesso/validar),
 //      se identificando com a chave secreta deste dispositivo.
+//      Funciona com http:// (testes no PC) e https:// (Azure).
 //   5. Acende o LED verde (permitido) ou vermelho (negado) e
 //      toca o buzzer, conforme a resposta da API.
 //
@@ -14,22 +15,37 @@
 // só lê o cartão e mostra o resultado. Assim, bloquear um usuário
 // no painel vale na hora, sem precisar reprogramar o dispositivo.
 //
+// CONFIGURAÇÃO PELO CELULAR (WiFiManager)
+// Sem Wi-Fi salvo (ou faltando a chave), o ESP32 cria a rede
+// "SyncGate-XXXX". Conecte nela pelo celular: abre uma página onde
+// você escolhe o Wi-Fi e informa o endereço da API, o ID e a chave
+// do dispositivo. Tudo fica salvo na memória do ESP32.
+// Para apagar e configurar de novo: segure o botão BOOT por 5 s.
+//
 // Bibliotecas necessárias (Arduino IDE → Gerenciador de Bibliotecas):
 //   - MFRC522      (autor: GithubCommunity)
 //   - ArduinoJson  (autor: Benoit Blanchon), versão 7
-// WiFi.h, HTTPClient.h e SPI.h já vêm com a placa ESP32.
+//   - WiFiManager  (autor: tzapu)
+// WiFi, HTTPClient, WiFiClientSecure, Preferences e SPI já vêm
+// com a placa ESP32.
 // ============================================================
 
 #include <SPI.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
+#include <WiFiManager.h>
 #include <MFRC522.h>
 #include <ArduinoJson.h>
 
-// Wi-Fi, endereço da API, id e chave do dispositivo.
+// Valores padrão (API, ID, chave, senha do portal).
 // Se der erro "config.h: No such file", copie o config.example.h
 // para config.h e preencha (veja o README.md desta pasta).
 #include "config.h"
+
+// Certificados raiz usados para conferir o servidor em https://
+#include "certificados.h"
 
 // ---- Pinos ---------------------------------------------------
 // Ligação do leitor RC522 (barramento SPI do ESP32).
@@ -44,6 +60,10 @@ const int PINO_LED_VERDE    = 2;   // com resistor de 220 Ω
 const int PINO_LED_VERMELHO = 4;   // com resistor de 220 Ω
 const int PINO_BUZZER       = 15;
 
+// Botão BOOT da própria placa (GPIO 0). Segurar por 5 s apaga a
+// configuração e reabre a página de configuração.
+const int PINO_BOTAO_RESET = 0;
+
 // Tipo do buzzer:
 //   true  = buzzer PASSIVO (precisa de um sinal de frequência — tone())
 //   false = buzzer ATIVO   (apita sozinho quando recebe energia)
@@ -56,10 +76,20 @@ const bool BUZZER_PASSIVO = true;
 // passagens (entrada, saída, entrada...) sem querer.
 const unsigned long INTERVALO_MESMO_CARTAO_MS = 3000;
 
-// Tempo máximo esperando a resposta da API.
-const int TIMEOUT_API_MS = 5000;
+// Tempo máximo esperando a resposta da API. É maior que numa rede
+// local porque a primeira conexão HTTPS (com a Azure) leva mais tempo.
+const int TIMEOUT_API_MS = 8000;
 
-// A cada quanto tempo tentar reconectar se o Wi-Fi cair.
+// Por quanto tempo a página de configuração fica aberta esperando
+// alguém configurar. Depois disso o ESP32 reinicia e tenta o Wi-Fi
+// salvo de novo — assim, se o roteador estava só desligado, a
+// catraca volta a funcionar sozinha quando ele voltar.
+const int TEMPO_PORTAL_S = 180;
+
+// Quanto tempo segurar o BOOT para apagar a configuração.
+const unsigned long TEMPO_RESET_MS = 5000;
+
+// A cada quanto tempo conferir se o Wi-Fi caiu.
 const unsigned long INTERVALO_RECONEXAO_MS = 5000;
 
 // ---- Tipos ---------------------------------------------------
@@ -74,9 +104,18 @@ enum Resultado { PERMITIDO, NEGADO, ERRO };
 // ---- Variáveis globais ---------------------------------------
 MFRC522 leitor(PINO_RFID_SS, PINO_RFID_RST);
 
+// Configuração em uso (carregada da memória do ESP32 ou do config.h)
+String apiUrl;
+int idDispositivo = 0;
+String chaveDispositivo;
+
+// "Preferences" é a memória permanente do ESP32 (não apaga ao
+// desligar). É onde guardamos o que foi configurado pelo celular.
+Preferences memoria;
+
 String ultimoUid = "";
 unsigned long momentoUltimaLeitura = 0;
-unsigned long momentoUltimaTentativaWifi = 0;
+unsigned long momentoUltimaVerificacaoWifi = 0;
 
 
 // ============================================================
@@ -135,89 +174,190 @@ void sinalErro() {
 
 
 // ============================================================
-// Wi-Fi
+// Configuração (memória do ESP32)
 // ============================================================
 
-// Explica em português o código de status do Wi-Fi do ESP32.
-const char *motivoWifi(wl_status_t status) {
-  switch (status) {
-    case WL_NO_SSID_AVAIL:
-      return "rede nao encontrada (nome errado ou rede so de 5 GHz)";
-    case WL_CONNECT_FAILED:
-      return "falha ao conectar (senha errada?)";
-    case WL_CONNECTION_LOST:
-      return "conexao perdida";
-    case WL_DISCONNECTED:
-      return "desconectado (senha errada ou sinal fraco?)";
-    default:
-      return "ainda tentando";
+// Carrega a configuração salva. O que nunca foi salvo pelo
+// celular usa o valor padrão do config.h.
+void carregarConfiguracao() {
+  memoria.begin("syncgate", true); // true = só leitura
+  apiUrl = memoria.getString("api_url", API_URL_PADRAO);
+  idDispositivo = memoria.getInt("id", ID_DISPOSITIVO_PADRAO);
+  chaveDispositivo = memoria.getString("chave", CHAVE_DISPOSITIVO_PADRAO);
+  memoria.end();
+}
+
+void salvarConfiguracao() {
+  memoria.begin("syncgate", false);
+  memoria.putString("api_url", apiUrl);
+  memoria.putInt("id", idDispositivo);
+  memoria.putString("chave", chaveDispositivo);
+  memoria.end();
+}
+
+// A chave gerada pelo painel tem sempre 64 caracteres.
+bool configuracaoCompleta() {
+  return apiUrl.startsWith("http") && idDispositivo > 0 && chaveDispositivo.length() == 64;
+}
+
+// Mostra a configuração no Monitor Serial, escondendo a chave.
+void mostrarConfiguracao() {
+  Serial.printf("[Config] API: %s\n", apiUrl.c_str());
+  Serial.printf("[Config] ID do dispositivo: %d\n", idDispositivo);
+  if (chaveDispositivo.length() == 64) {
+    Serial.printf("[Config] Chave: %s... (64 caracteres)\n", chaveDispositivo.substring(0, 6).c_str());
+  } else {
+    Serial.println("[Config] Chave: NAO CONFIGURADA");
   }
 }
 
-// Lista as redes Wi-Fi que o ESP32 está enxergando. Ajuda a
-// descobrir se o nome no config.h está certo (maiúsculas contam!)
-// e se a rede aparece — redes só de 5 GHz NÃO aparecem aqui.
-void listarRedesVisiveis() {
-  Serial.println("[WiFi] Procurando redes visiveis...");
-  int quantidade = WiFi.scanNetworks();
-  if (quantidade <= 0) {
-    Serial.println("[WiFi] Nenhuma rede 2,4 GHz encontrada.");
-    return;
-  }
-  for (int i = 0; i < quantidade; i++) {
-    Serial.printf("   %2d) \"%s\"  (sinal %d dBm)%s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i),
-                  WiFi.SSID(i) == WIFI_SSID ? "  <-- e a do config.h" : "");
-  }
-  WiFi.scanDelete();
+
+// ============================================================
+// Wi-Fi + página de configuração (WiFiManager)
+// ============================================================
+
+// Fica true quando alguém salva a página de configuração.
+bool configuracaoFoiSalva = false;
+
+// Nome da rede de configuração: "SyncGate-" + final do MAC da placa,
+// para dar para diferenciar várias catracas no mesmo lugar.
+String nomeRedeConfiguracao() {
+  String mac = WiFi.macAddress(); // "AA:BB:CC:DD:EE:FF"
+  mac.replace(":", "");
+  return "SyncGate-" + mac.substring(8);
 }
 
-// Conexão inicial: fica tentando (LED verde piscando) até conectar.
-// A cada 20 s sem conseguir, mostra o motivo e as redes visíveis
-// no Monitor Serial, e tenta de novo.
+// Conecta no Wi-Fi salvo. Se não houver Wi-Fi salvo, se não
+// conseguir conectar, ou se faltar configurar a chave, abre a
+// página de configuração (rede "SyncGate-XXXX").
 void conectarWifi() {
   WiFi.mode(WIFI_STA);
+  WiFiManager gerenciador;
 
-  while (true) {
-    Serial.printf("[WiFi] Conectando em \"%s\"", WIFI_SSID);
-    WiFi.begin(WIFI_SSID, WIFI_SENHA);
+  // Campos extras da página, além da escolha do Wi-Fi.
+  // A chave começa vazia de propósito: quem abrir a página não
+  // consegue ver a chave atual. Vazio = manter a que já está salva.
+  char textoId[12];
+  snprintf(textoId, sizeof(textoId), "%d", idDispositivo);
+  WiFiManagerParameter campoUrl("api_url", "Endereco da API (https://.../api/acesso/validar)", apiUrl.c_str(), 150);
+  WiFiManagerParameter campoId("id", "ID do dispositivo (painel: Dispositivos)", textoId, 10);
+  WiFiManagerParameter campoChave("chave", "Chave do dispositivo (64 caracteres; vazio = manter a atual)", "", 65);
+  gerenciador.addParameter(&campoUrl);
+  gerenciador.addParameter(&campoId);
+  gerenciador.addParameter(&campoChave);
 
-    bool ledAceso = false;
-    unsigned long inicio = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - inicio < 20000) {
-      ledAceso = !ledAceso;
-      digitalWrite(PINO_LED_VERDE, ledAceso ? HIGH : LOW);
-      Serial.print(".");
-      delay(300);
-    }
+  gerenciador.setSaveConfigCallback([]() { configuracaoFoiSalva = true; });
+  // Salva os campos mesmo se a conexão com o Wi-Fi escolhido falhar
+  // (ex.: senha digitada errada) — assim não precisa preencher tudo de novo.
+  gerenciador.setBreakAfterConfig(true);
+  gerenciador.setConnectTimeout(20);
+  gerenciador.setConfigPortalTimeout(TEMPO_PORTAL_S);
 
-    if (WiFi.status() == WL_CONNECTED) break;
+  String nomeRede = nomeRedeConfiguracao();
 
+  // Avisa no Serial e nos LEDs quando a página de configuração abrir.
+  gerenciador.setAPCallback([nomeRede](WiFiManager *) {
     Serial.println();
-    Serial.printf("[WiFi] Nao conectou: %s\n", motivoWifi(WiFi.status()));
-    WiFi.disconnect();
-    delay(200);
-    listarRedesVisiveis();
-    Serial.println("[WiFi] Tentando de novo...");
+    Serial.println("[Config] ====== MODO DE CONFIGURACAO ======");
+    Serial.printf("[Config] 1. No celular, conecte na rede Wi-Fi \"%s\"\n", nomeRede.c_str());
+    Serial.println("[Config]    (senha: a SENHA_PORTAL do config.h)");
+    Serial.println("[Config] 2. A pagina abre sozinha. Se nao abrir, acesse http://192.168.4.1");
+    Serial.println("[Config] 3. Toque em \"Configure WiFi\", escolha a rede e preencha os campos.");
+    digitalWrite(PINO_LED_VERDE, HIGH);
+    digitalWrite(PINO_LED_VERMELHO, HIGH);
+  });
+
+  bool conectado;
+  if (configuracaoCompleta()) {
+    Serial.println("[WiFi] Conectando no Wi-Fi salvo...");
+    // Tenta o Wi-Fi salvo; se não der, abre a página sozinho.
+    conectado = gerenciador.autoConnect(nomeRede.c_str(), SENHA_PORTAL);
+  } else {
+    Serial.println("[Config] Falta configurar a API, o ID ou a chave. Abrindo a pagina de configuracao...");
+    conectado = gerenciador.startConfigPortal(nomeRede.c_str(), SENHA_PORTAL);
   }
 
   apagarLeds();
-  Serial.println();
-  Serial.print("[WiFi] Conectado! IP do ESP32: ");
+
+  if (configuracaoFoiSalva) {
+    String novaUrl = String(campoUrl.getValue());
+    novaUrl.trim();
+    if (novaUrl.length() > 0) apiUrl = novaUrl;
+
+    int novoId = atoi(campoId.getValue());
+    if (novoId > 0) idDispositivo = novoId;
+
+    String novaChave = String(campoChave.getValue());
+    novaChave.trim();
+    if (novaChave.length() == 64) {
+      chaveDispositivo = novaChave;
+    } else if (novaChave.length() > 0) {
+      Serial.printf("[Config] Chave ignorada: tem %d caracteres (precisa ter 64).\n", novaChave.length());
+    }
+
+    salvarConfiguracao();
+    Serial.println("[Config] Configuracao salva na memoria do ESP32.");
+    mostrarConfiguracao();
+    configuracaoFoiSalva = false;
+  }
+
+  if (!conectado || !configuracaoCompleta()) {
+    // Ninguém configurou a tempo, o Wi-Fi não conectou, ou ainda
+    // falta algum campo: reinicia e tenta de novo do começo.
+    Serial.println("[WiFi] Sem Wi-Fi ou configuracao incompleta. Reiniciando em 3 s...");
+    delay(3000);
+    ESP.restart();
+  }
+
+  // Se o Wi-Fi cair depois, o próprio ESP32 tenta reconectar.
+  WiFi.setAutoReconnect(true);
+
+  Serial.print("[WiFi] Conectado em \"");
+  Serial.print(WiFi.SSID());
+  Serial.print("\"! IP do ESP32: ");
   Serial.println(WiFi.localIP());
 }
 
-// Durante o funcionamento: se o Wi-Fi cair, tenta reconectar de
-// tempos em tempos SEM travar o programa (por isso não usa while).
+// Durante o funcionamento: se o Wi-Fi cair, pede para reconectar
+// de tempos em tempos SEM travar o programa.
 void manterWifi() {
   if (WiFi.status() == WL_CONNECTED) return;
 
   unsigned long agora = millis();
-  if (agora - momentoUltimaTentativaWifi < INTERVALO_RECONEXAO_MS) return;
+  if (agora - momentoUltimaVerificacaoWifi < INTERVALO_RECONEXAO_MS) return;
 
-  momentoUltimaTentativaWifi = agora;
-  Serial.println("[WiFi] Sem conexão. Tentando reconectar...");
-  WiFi.disconnect();
-  WiFi.begin(WIFI_SSID, WIFI_SENHA);
+  momentoUltimaVerificacaoWifi = agora;
+  Serial.println("[WiFi] Sem conexao. Tentando reconectar...");
+  WiFi.reconnect();
+}
+
+// Segurar o botão BOOT por TEMPO_RESET_MS apaga o Wi-Fi e a
+// configuração salvos e reinicia — o ESP32 volta para o modo de
+// configuração. Útil para levar a catraca para outro local.
+void verificarBotaoReset() {
+  if (digitalRead(PINO_BOTAO_RESET) != LOW) return;
+
+  Serial.println("[Config] Botao BOOT pressionado. Segure por 5 s para apagar a configuracao...");
+  unsigned long inicio = millis();
+  while (digitalRead(PINO_BOTAO_RESET) == LOW) {
+    // Vermelho piscando enquanto o botão está pressionado.
+    digitalWrite(PINO_LED_VERMELHO, (millis() / 200) % 2 ? HIGH : LOW);
+
+    if (millis() - inicio >= TEMPO_RESET_MS) {
+      Serial.println("[Config] Apagando Wi-Fi e configuracao...");
+      WiFiManager gerenciador;
+      gerenciador.resetSettings(); // apaga o Wi-Fi salvo
+      memoria.begin("syncgate", false);
+      memoria.clear(); // apaga API, ID e chave (voltam ao padrão do config.h)
+      memoria.end();
+      bipe(1500, 500);
+      ESP.restart();
+    }
+    delay(20);
+  }
+
+  apagarLeds();
+  Serial.println("[Config] Botao solto antes de 5 s. Nada foi apagado.");
 }
 
 
@@ -242,7 +382,7 @@ String uidEmTexto(const MFRC522::Uid &uid) {
 // quase sempre é fio solto, trocado ou alimentação errada.
 bool leitorRespondendo() {
   byte versao = leitor.PCD_ReadRegister(MFRC522::VersionReg);
-  Serial.printf("[RFID] Versão do RC522: 0x%02X\n", versao);
+  Serial.printf("[RFID] Versao do RC522: 0x%02X\n", versao);
   return versao != 0x00 && versao != 0xFF;
 }
 
@@ -253,39 +393,59 @@ bool leitorRespondendo() {
 
 Resultado validarNaApi(const String &uid) {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[API] Sem Wi-Fi, não dá para validar.");
+    Serial.println("[API] Sem Wi-Fi, nao da para validar.");
     return ERRO;
   }
 
   // Monta o corpo da requisição: {"uid":"A1B2C3D4","id_dispositivo":1}
   JsonDocument pedido;
   pedido["uid"] = uid;
-  pedido["id_dispositivo"] = ID_DISPOSITIVO;
+  pedido["id_dispositivo"] = idDispositivo;
   String corpo;
   serializeJson(pedido, corpo);
 
+  // http:// usa uma conexão comum; https:// usa uma conexão segura
+  // que confere o certificado do servidor contra os certificados
+  // raiz de certificados.h. Se o servidor não for quem diz ser, a
+  // conexão falha — os dados nunca chegam a um impostor.
+  WiFiClient clienteComum;
+  WiFiClientSecure clienteSeguro;
   HTTPClient http;
   http.setTimeout(TIMEOUT_API_MS);
-  http.begin(API_URL);
+
+  bool iniciou;
+  if (apiUrl.startsWith("https://")) {
+    clienteSeguro.setCACert(CERTIFICADOS_RAIZ);
+    iniciou = http.begin(clienteSeguro, apiUrl);
+  } else {
+    iniciou = http.begin(clienteComum, apiUrl);
+  }
+
+  if (!iniciou) {
+    Serial.printf("[API] Endereco invalido: %s\n", apiUrl.c_str());
+    return ERRO;
+  }
+
   http.addHeader("Content-Type", "application/json");
   // A chave secreta prova para a API que este é mesmo o
   // dispositivo cadastrado (sem ela, a API responde 401).
-  http.addHeader("X-Dispositivo-Chave", CHAVE_DISPOSITIVO);
+  http.addHeader("X-Dispositivo-Chave", chaveDispositivo);
 
   int codigo = http.POST(corpo);
   String resposta = http.getString();
   http.end();
 
   // Códigos negativos = nem chegou a falar com a API
-  // (IP errado, backend desligado, firewall bloqueando...).
+  // (endereço errado, servidor fora do ar, certificado recusado...).
   if (codigo <= 0) {
-    Serial.printf("[API] Falha de conexão: %s\n", HTTPClient::errorToString(codigo).c_str());
-    Serial.println("      Confira o API_URL no config.h e se o backend está rodando.");
+    Serial.printf("[API] Falha de conexao: %s\n", HTTPClient::errorToString(codigo).c_str());
+    Serial.println("      Confira o endereco da API e se o backend esta no ar.");
     return ERRO;
   }
 
   if (codigo == 401) {
-    Serial.println("[API] 401: chave ou id do dispositivo inválidos. Confira o config.h.");
+    Serial.println("[API] 401: chave ou ID do dispositivo invalidos.");
+    Serial.println("      Segure o BOOT por 5 s e configure de novo pelo celular.");
     return ERRO;
   }
 
@@ -302,7 +462,7 @@ Resultado validarNaApi(const String &uid) {
   // Lê a resposta: {"permitido":true,"tipo_movimento":"entrada","motivo":null}
   JsonDocument respostaJson;
   if (deserializeJson(respostaJson, resposta)) {
-    Serial.println("[API] Resposta não é um JSON válido.");
+    Serial.println("[API] Resposta nao e um JSON valido.");
     return ERRO;
   }
 
@@ -327,11 +487,12 @@ void setup() {
   Serial.begin(115200);
   delay(200);
   Serial.println();
-  Serial.println("===== SyncGate — leitor de acesso =====");
+  Serial.println("===== SyncGate - leitor de acesso =====");
 
   pinMode(PINO_LED_VERDE, OUTPUT);
   pinMode(PINO_LED_VERMELHO, OUTPUT);
   pinMode(PINO_BUZZER, OUTPUT);
+  pinMode(PINO_BOTAO_RESET, INPUT_PULLUP);
   apagarLeds();
 
   // Inicia o barramento SPI com os pinos definidos lá em cima
@@ -341,7 +502,7 @@ void setup() {
   delay(50);
 
   if (!leitorRespondendo()) {
-    Serial.println("[RFID] O RC522 NÃO está respondendo. Confira a ligação dos fios e o 3,3 V.");
+    Serial.println("[RFID] O RC522 NAO esta respondendo. Confira a ligacao dos fios e o 3,3 V.");
     // Pisca o vermelho para sempre: não adianta continuar sem leitor.
     while (true) {
       sinalErro();
@@ -349,10 +510,13 @@ void setup() {
     }
   }
 
+  carregarConfiguracao();
+  mostrarConfiguracao();
+
   conectarWifi();
 
-  Serial.printf("[SyncGate] Dispositivo %d pronto. API: %s\n", ID_DISPOSITIVO, API_URL);
-  Serial.println("[SyncGate] Aproxime um cartão do leitor...");
+  Serial.printf("[SyncGate] Dispositivo %d pronto.\n", idDispositivo);
+  Serial.println("[SyncGate] Aproxime um cartao do leitor...");
   bipe(1500, 80); // bipe curto de "pronto"
 }
 
@@ -361,6 +525,7 @@ void setup() {
 // loop() roda sem parar depois do setup()
 // ============================================================
 void loop() {
+  verificarBotaoReset();
   manterWifi();
 
   // Nenhum cartão novo encostado? Volta e espera.
@@ -384,7 +549,7 @@ void loop() {
   ultimoUid = uid;
   momentoUltimaLeitura = agora;
 
-  Serial.printf("\n[RFID] Cartão lido. UID: %s\n", uid.c_str());
+  Serial.printf("\n[RFID] Cartao lido. UID: %s\n", uid.c_str());
 
   switch (validarNaApi(uid)) {
     case PERMITIDO:
