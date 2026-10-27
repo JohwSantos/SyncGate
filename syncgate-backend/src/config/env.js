@@ -21,4 +21,18 @@ module.exports = {
   // o valor abaixo só existe para não quebrar o projeto em
   // ambiente de desenvolvimento se alguém esquecer de configurar.
   jwtSecret: process.env.JWT_SECRET || 'dev_secret_troque_em_producao',
+
+  // Fuso horário do sistema. Controle de acesso depende de "que
+  // horas são agora" (regras de horário, relatórios de hoje), então
+  // não podemos confiar no relógio do servidor: no Docker ele roda
+  // em UTC, 3 horas à frente de Brasília.
+  //
+  // - timezone: nome do fuso (padrão IANA), usado pelo Node para
+  //   calcular dia da semana e hora atual.
+  // - dbTimezone: o mesmo fuso, escrito como deslocamento (-03:00),
+  //   que é o formato que o MySQL/MariaDB aceita sem precisar de
+  //   tabelas extras de fuso instaladas. O Brasil não tem mais
+  //   horário de verão desde 2019, então -03:00 é fixo.
+  timezone: process.env.APP_TIMEZONE || 'America/Sao_Paulo',
+  dbTimezone: process.env.DB_TIMEZONE || '-03:00',
 };

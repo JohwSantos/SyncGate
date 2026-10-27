@@ -52,6 +52,14 @@ Edite o `.env` com os dados do seu MySQL e defina um `JWT_SECRET` próprio. Crie
 mysql -u root < database/schema.sql
 ```
 
+**Já tinha um banco criado antes?** Aplique as migrações da pasta `database/migracoes/`, em ordem, em vez de recriar o banco:
+
+```bash
+mysql -u root syncgate < database/migracoes/002_login_unico.sql
+```
+
+O sistema trabalha sempre no horário de Brasília, mesmo que o servidor esteja em outro fuso (como o Docker, que usa UTC). Isso é configurado por `APP_TIMEZONE` e `DB_TIMEZONE` no `.env`.
+
 Suba o servidor:
 
 ```bash
@@ -90,7 +98,8 @@ npm run seed:admin -- "Seu Nome" "12345678900" "admin" "suaSenha123"
 | RN02 — um cartão por usuário | Estrutura da tabela `cartoes` |
 | RN03 — toda tentativa é registrada, mesmo negada | `acesso.service.js` |
 | RN04 — usuário bloqueado não acessa | `acesso.service.js` |
-| RN05 — UID e CPF únicos | Constraint do banco + validação no service (`409`) |
+| RN05 — UID, CPF e login únicos | Constraint do banco + validação no service (`409`) |
+| Fuso horário (Brasília) | `config/env.js` + `config/database.js` (`APP_TIMEZONE`, `DB_TIMEZONE`) |
 | RN06 — restrição por horário | `horarioAcesso.model.js` + `acesso.service.js` |
 | RN08 — log de acesso imutável | Nenhuma rota de UPDATE/DELETE em `acesso` |
 | RF09 — bloqueio sem exclusão | `definirStatus` / `definirAtivo` |

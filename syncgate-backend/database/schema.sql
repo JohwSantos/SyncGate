@@ -41,10 +41,11 @@ CREATE TABLE usuarios (
   criado_em       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   atualizado_em   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-  -- Só o CPF é único, por decisão do projeto (o login pode
-  -- se repetir entre usuários — algo a ter em mente na etapa
-  -- de autenticação, mais pra frente).
-  CONSTRAINT uq_usuarios_cpf UNIQUE (cpf)
+  -- CPF e login são únicos. O login precisa ser único porque é
+  -- por ele que a pessoa entra no painel: com dois logins iguais,
+  -- o sistema não saberia de qual usuário é a senha digitada.
+  CONSTRAINT uq_usuarios_cpf UNIQUE (cpf),
+  CONSTRAINT uq_usuarios_login UNIQUE (login)
 ) ENGINE=InnoDB;
 
 -- Índice de apoio para buscas por tipo (ex.: listar todos os alunos)

@@ -103,12 +103,29 @@ async function criar(dados, quemFaz = null) {
     throw erroComStatus('Já existe um usuário cadastrado com este CPF', 409);
   }
 
+  // Login também é único: com dois usuários de mesmo login, o
+  // sistema não teria como saber qual deles está tentando entrar.
+  const loginEmUso = await usuarioModel.buscarPorLogin(login);
+  if (loginEmUso) {
+    throw erroComStatus('Este login já está em uso por outro usuário', 409);
+  }
+
   // Nunca guardamos a senha em texto puro — transformamos em hash.
   // O "10" é o custo do algoritmo bcrypt (quanto maior, mais lento
   // e mais seguro; 10 é um valor padrão razoável).
   const senha_hash = await bcrypt.hash(senha, 10);
 
-  return usuarioModel.criar({ ...dados, perfil: perfil || null, senha_hash });
+  try {
+    return await usuarioModel.criar({ ...dados, perfil: perfil || null, senha_hash });
+  } catch (erro) {
+    // Rede de segurança: se dois cadastros com o mesmo CPF/login
+    // chegarem ao mesmo tempo, as checagens acima podem passar para
+    // os dois — mas a restrição UNIQUE do banco barra o segundo.
+    if (erro.code === 'ER_DUP_ENTRY') {
+      throw erroComStatus('Já existe um usuário com este CPF ou login', 409);
+    }
+    throw erro;
+  }
 }
 
 async function atualizar(id, dados, quemFaz = null) {

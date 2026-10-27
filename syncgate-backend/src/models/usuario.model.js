@@ -59,6 +59,16 @@ async function buscarPorCpf(cpf) {
   return linhas[0] || null;
 }
 
+// Usada para conferir se um login já está em uso antes de
+// cadastrar (o login é único — ver schema.sql).
+async function buscarPorLogin(login) {
+  const [linhas] = await pool.query(
+    `SELECT ${COLUNAS} FROM usuarios WHERE login = ?`,
+    [login]
+  );
+  return linhas[0] || null;
+}
+
 // Usada só pela futura etapa de autenticação — é a única função
 // que devolve o senha_hash.
 async function buscarPorLoginComSenha(login) {
@@ -136,6 +146,7 @@ module.exports = {
   listarPaginado,
   buscarPorId,
   buscarPorCpf,
+  buscarPorLogin,
   buscarPorLoginComSenha,
   criar,
   atualizar,

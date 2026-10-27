@@ -4,6 +4,7 @@ const usuarioModel = require('../models/usuario.model');
 const dispositivoModel = require('../models/dispositivo.model');
 const horarioModel = require('../models/horarioAcesso.model');
 const websocket = require('../websocket/socket');
+const env = require('../config/env');
 
 function erroComStatus(mensagem, status) {
   const erro = new Error(mensagem);
@@ -11,17 +12,37 @@ function erroComStatus(mensagem, status) {
   return erro;
 }
 
-// Converte o dia da semana atual (0=domingo ... 6=sábado, padrão
-// do JavaScript) para o formato usado no banco (seg, ter, ...).
-const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-function diaSemanaAtual() {
-  return DIAS[new Date().getDay()];
+// Dia da semana e hora atuais SEMPRE no fuso configurado
+// (America/Sao_Paulo por padrão), e não no relógio do servidor.
+// Antes usávamos new Date().getDay() e toTimeString(), que seguem
+// o fuso da máquina — no Docker (UTC) isso deixava as regras de
+// horário 3 horas adiantadas.
+//
+// Intl.DateTimeFormat é nativo do JavaScript: ele "traduz" um
+// instante para o horário de um fuso específico.
+const DIAS = { Sun: 'dom', Mon: 'seg', Tue: 'ter', Wed: 'qua', Thu: 'qui', Fri: 'sex', Sat: 'sab' };
+
+const formatoDia = new Intl.DateTimeFormat('en-US', {
+  timeZone: env.timezone,
+  weekday: 'short', // "Mon", "Tue", ...
+});
+
+const formatoHora = new Intl.DateTimeFormat('en-GB', {
+  timeZone: env.timezone,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23', // 00-23 (nunca "24:00")
+});
+
+// Formato usado no banco (seg, ter, ...)
+function diaSemanaAtual(agora = new Date()) {
+  return DIAS[formatoDia.format(agora)];
 }
 
-// Formata a hora atual como "HH:MM:SS", para comparar com as
-// colunas TIME do banco.
-function horaAtual() {
-  return new Date().toTimeString().slice(0, 8);
+// "HH:MM:SS", para comparar com as colunas TIME do banco
+function horaAtual(agora = new Date()) {
+  return formatoHora.format(agora);
 }
 
 // Decide se a próxima passagem do usuário é entrada ou saída,
