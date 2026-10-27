@@ -41,6 +41,12 @@ async function vincular(dados) {
     throw erroComStatus('Campos obrigatórios: uid, id_usuario', 400);
   }
 
+  // Datas no formato AAAA-MM-DD (o que o <input type="date"> envia),
+  // que podem ser comparadas como texto: "2026-01-10" < "2026-12-31".
+  if (data_emissao && data_validade && data_validade < data_emissao) {
+    throw erroComStatus('A data de validade não pode ser anterior à data de emissão', 400);
+  }
+
   // RF08: só é possível vincular um cartão a um usuário que existe
   const usuario = await usuarioModel.buscarPorId(id_usuario);
   if (!usuario) {

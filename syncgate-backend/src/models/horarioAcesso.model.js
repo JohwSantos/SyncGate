@@ -55,12 +55,18 @@ async function contarRegrasDoUsuario(idUsuario) {
 }
 
 // Verifica se existe alguma regra do usuário que cubra o dia da
-// semana e o horário atual informados.
-async function existeRegraValidaAgora(idUsuario, diaSemana, horaAtual) {
+// semana e o horário atual informados, NESTE dispositivo.
+// Uma regra com id_dispositivo vazio (NULL) vale para qualquer
+// dispositivo; uma regra com id_dispositivo preenchido só vale
+// para aquela catraca específica.
+async function existeRegraValidaAgora(idUsuario, idDispositivo, diaSemana, horaAtual) {
   const [linhas] = await pool.query(
     `SELECT COUNT(*) AS total FROM horarios_acesso
-     WHERE id_usuario = ? AND dia_semana = ? AND ? BETWEEN hora_inicio AND hora_fim`,
-    [idUsuario, diaSemana, horaAtual]
+     WHERE id_usuario = ?
+       AND (id_dispositivo IS NULL OR id_dispositivo = ?)
+       AND dia_semana = ?
+       AND ? BETWEEN hora_inicio AND hora_fim`,
+    [idUsuario, idDispositivo, diaSemana, horaAtual]
   );
   return linhas[0].total > 0;
 }

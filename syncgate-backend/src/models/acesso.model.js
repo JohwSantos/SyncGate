@@ -5,7 +5,7 @@ const { pool } = require('../config/database');
 
 async function listarTodos() {
   const [linhas] = await pool.query(
-    `SELECT * FROM acesso ORDER BY data_hora DESC`
+    `SELECT * FROM acesso ORDER BY data_hora DESC, id_acesso DESC`
   );
   return linhas;
 }
@@ -42,7 +42,7 @@ async function listarPaginado(pagina = 1, limite = 15, filtros = {}) {
     parametros
   );
   const [linhas] = await pool.query(
-    `SELECT * FROM acesso ${where} ORDER BY data_hora DESC LIMIT ? OFFSET ?`,
+    `SELECT * FROM acesso ${where} ORDER BY data_hora DESC, id_acesso DESC LIMIT ? OFFSET ?`,
     [...parametros, limite, offset]
   );
   return { dados: linhas, total };
@@ -56,12 +56,20 @@ async function buscarPorId(idAcesso) {
   return linhas[0] || null;
 }
 
-// Busca o último registro de acesso de um usuário — usado para
-// decidir automaticamente se a próxima passagem dele é uma
-// entrada ou uma saída (alternando).
-async function buscarUltimoPorUsuario(idUsuario) {
+// Busca a última passagem PERMITIDA de um usuário — usada para
+// decidir automaticamente se a próxima passagem dele é uma entrada
+// ou uma saída (alternando). Tentativas negadas ficam de fora, pois
+// não mudaram a pessoa de lugar.
+//
+// Ordenamos por id_acesso (e não por data_hora) porque o id sempre
+// cresce: duas leituras no mesmo segundo teriam a mesma data_hora,
+// e o banco poderia devolver qualquer uma das duas como "a última".
+async function buscarUltimoPermitidoPorUsuario(idUsuario) {
   const [linhas] = await pool.query(
-    `SELECT * FROM acesso WHERE id_usuario = ? ORDER BY data_hora DESC LIMIT 1`,
+    `SELECT * FROM acesso
+      WHERE id_usuario = ? AND status = 'permitido'
+      ORDER BY id_acesso DESC
+      LIMIT 1`,
     [idUsuario]
   );
   return linhas[0] || null;
@@ -86,6 +94,6 @@ module.exports = {
   listarTodos,
   listarPaginado,
   buscarPorId,
-  buscarUltimoPorUsuario,
+  buscarUltimoPermitidoPorUsuario,
   registrar,
 };

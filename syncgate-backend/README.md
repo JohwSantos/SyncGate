@@ -100,7 +100,10 @@ npm run seed:admin -- "Seu Nome" "12345678900" "admin" "suaSenha123"
 | RN04 — usuário bloqueado não acessa | `acesso.service.js` |
 | RN05 — UID, CPF e login únicos | Constraint do banco + validação no service (`409`) |
 | Fuso horário (Brasília) | `config/env.js` + `config/database.js` (`APP_TIMEZONE`, `DB_TIMEZONE`) |
-| RN06 — restrição por horário | `horarioAcesso.model.js` + `acesso.service.js` |
+| RN06 — restrição por horário (geral ou por dispositivo) | `horarioAcesso.model.js` + `acesso.service.js` |
+| Cartão vencido (`data_validade`) não acessa | `acesso.service.js` |
+| Dispositivo em manutenção não libera acesso | `acesso.service.js` |
+| Entrada/saída alternam só com acessos permitidos | `acesso.service.js` + `acesso.model.js` |
 | RN08 — log de acesso imutável | Nenhuma rota de UPDATE/DELETE em `acesso` |
 | RF09 — bloqueio sem exclusão | `definirStatus` / `definirAtivo` |
 

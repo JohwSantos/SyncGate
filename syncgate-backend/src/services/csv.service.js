@@ -3,6 +3,7 @@ const { parse } = require('csv-parse/sync');
 const { pool } = require('../config/database');
 const usuarioModel = require('../models/usuario.model');
 const usuarioService = require('../services/usuario.service');
+const cartaoService = require('../services/cartao.service');
 const cartaoModel = require('../models/cartao.model');
 const dispositivoModel = require('../models/dispositivo.model');
 
@@ -199,7 +200,9 @@ async function importarCartoes(buffer) {
     }
 
     try {
-      await cartaoModel.criar({
+      // Passa pelo mesmo service do painel (mesmas validações,
+      // ex.: validade não pode ser anterior à emissão).
+      await cartaoService.vincular({
         uid: reg.uid,
         data_emissao: reg.data_emissao || null,
         data_validade: reg.data_validade || null,
