@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import Badge from '../components/Badge';
 import Spinner from '../components/Spinner';
 import EstadoVazio from '../components/EstadoVazio';
+import Paginacao from '../components/Paginacao';
 import { useSocket } from '../hooks/useSocket';
 import { usePermissoes } from '../hooks/usePermissoes';
 
@@ -20,15 +21,26 @@ export default function Solicitacoes() {
   const [erroAcao, setErroAcao] = useState(null);
   const [acaoEmAndamento, setAcaoEmAndamento] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
-  async function carregarDados() {
+  // Carrega uma página de solicitações (10 por vez, mais recentes
+  // primeiro). Os usuários vêm completos para mostrar os nomes.
+  async function carregarDados(pag = pagina) {
     try {
       setCarregando(true);
-      const [listaSolicitacoes, listaUsuarios] = await Promise.all([
-        api.get('/solicitacoes'),
+      const [respSolicitacoes, listaUsuarios] = await Promise.all([
+        api.get(`/solicitacoes?pagina=${pag}&limite=10`),
         api.get('/usuarios'),
       ]);
-      setSolicitacoes(listaSolicitacoes);
+      if (respSolicitacoes.dados.length === 0 && pag > 1) {
+        return carregarDados(pag - 1);
+      }
+      setSolicitacoes(respSolicitacoes.dados);
+      setPagina(respSolicitacoes.pagina);
+      setTotalPaginas(respSolicitacoes.totalPaginas);
+      setTotalRegistros(respSolicitacoes.total);
       setUsuarios(listaUsuarios);
       setErroLista(null);
     } catch (erro) {
@@ -39,23 +51,28 @@ export default function Solicitacoes() {
   }
 
   useEffect(() => {
-    carregarDados();
+    carregarDados(1);
   }, []);
 
   // Se outra pessoa (ou o proprio operador, em outra aba) aprovar
   // ou rejeitar uma solicitacao, essa tela se atualiza sozinha.
   useSocket({
     'solicitacao-atualizada': (solicitacaoAtualizada) => {
-      setSolicitacoes((atual) => {
-        const jaExiste = atual.some(
-          (s) => s.id_solicitacao === solicitacaoAtualizada.id_solicitacao
+      const estaNaPagina = solicitacoes.some(
+        (s) => s.id_solicitacao === solicitacaoAtualizada.id_solicitacao
+      );
+      if (estaNaPagina) {
+        // Aprovada/rejeitada: atualiza a linha na hora.
+        setSolicitacoes((atual) =>
+          atual.map((s) =>
+            s.id_solicitacao === solicitacaoAtualizada.id_solicitacao ? solicitacaoAtualizada : s
+          )
         );
-        return jaExiste
-          ? atual.map((s) =>
-              s.id_solicitacao === solicitacaoAtualizada.id_solicitacao ? solicitacaoAtualizada : s
-            )
-          : [solicitacaoAtualizada, ...atual];
-      });
+      } else if (pagina === 1) {
+        // Solicitação nova: entra no topo da página 1. Recarregamos
+        // a página para manter os 10 itens e o total certos.
+        carregarDados(1);
+      }
     },
   });
 
@@ -79,9 +96,9 @@ export default function Solicitacoes() {
     return usuario ? usuario.nome : `Usuario #${idUsuario}`;
   }
 
-  function aoCriar(solicitacaoCriada) {
-    setSolicitacoes((atual) => [solicitacaoCriada, ...atual]);
+  function aoCriar() {
     setModalAberto(false);
+    carregarDados(1); // a nova aparece no topo da primeira página
   }
 
   return (
@@ -184,6 +201,12 @@ export default function Solicitacoes() {
               )}
             </tbody>
           </table>
+          <Paginacao
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            total={totalRegistros}
+            aoMudar={carregarDados}
+          />
         </div>
       ) : null}
 

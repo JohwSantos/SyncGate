@@ -6,7 +6,11 @@
 //   total        — total de registros (opcional)
 //   aoMudar      — callback(novaPagina)
 export default function Paginacao({ pagina, totalPaginas, total, aoMudar }) {
-  if (totalPaginas <= 1) return null;
+  // Só some quando não há nenhum registro. Com uma única página, a
+  // barra continua aparecendo (com o total de registros e os botões
+  // desativados) — antes ela sumia, e parecia que a tela não tinha
+  // paginação.
+  if (!total && totalPaginas <= 1) return null;
 
   function gerarPaginas() {
     const paginas = [];

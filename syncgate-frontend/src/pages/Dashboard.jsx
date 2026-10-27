@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, CreditCard, Router, ShieldCheck, ShieldX,
   Activity, Clock, Wifi, WifiOff, Printer
@@ -30,10 +30,44 @@ export default function Dashboard() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
 
+  // Recarrega só os números dos cards (sem o "Carregando..." da
+  // tela toda). Se chegarem vários eventos seguidos, espera 400 ms
+  // e faz UMA requisição só, em vez de uma por evento.
+  const temporizadorResumo = useRef(null);
+  const atualizarResumo = useCallback(() => {
+    clearTimeout(temporizadorResumo.current);
+    temporizadorResumo.current = setTimeout(async () => {
+      try {
+        setResumo(await api.get('/relatorios/resumo'));
+      } catch {
+        // Falhou uma atualização em segundo plano: mantém os números
+        // atuais; a próxima atualização tenta de novo.
+      }
+    }, 400);
+  }, []);
+
+  useEffect(() => () => clearTimeout(temporizadorResumo.current), []);
+
   const { conectado } = useSocket({
-    'novo-acesso': (novoAcesso) => {
-      setAcessosRecentes((prev) => [novoAcesso, ...prev].slice(0, 15));
+    // O evento chega como { permitido, motivo, usuario?, registro }.
+    // O registro do acesso (a "linha" do histórico) é o `registro`;
+    // antes usávamos o objeto inteiro, e a linha aparecia sem hora,
+    // sem nome e sempre como "Negado".
+    'novo-acesso': (evento) => {
+      const registro = {
+        ...evento.registro,
+        // No acesso permitido, o nome já vem no evento — assim um
+        // usuário cadastrado depois de abrir a tela também aparece.
+        nome_usuario: evento.usuario?.nome,
+      };
+      setAcessosRecentes((anteriores) =>
+        [registro, ...anteriores.filter((a) => a.id_acesso !== registro.id_acesso)].slice(0, 15)
+      );
+      atualizarResumo();
     },
+    // Também mudam números dos cards:
+    'dispositivo-atualizado': atualizarResumo, // "Dispositivos online"
+    'solicitacao-atualizada': atualizarResumo, // aviso de pendentes
   });
 
   const carregar = useCallback(async () => {
@@ -158,7 +192,7 @@ export default function Dashboard() {
               <LinhaAcesso
                 key={acesso.id_acesso}
                 acesso={acesso}
-                nomeUsuario={nomeDoUsuario(acesso.id_usuario)}
+                nomeUsuario={acesso.nome_usuario || nomeDoUsuario(acesso.id_usuario)}
                 formatarDataHora={formatarDataHora}
               />
             ))}

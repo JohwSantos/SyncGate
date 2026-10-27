@@ -11,6 +11,18 @@ async function listarTodos() {
   return linhas;
 }
 
+// Versão paginada: devolve { dados, total } — mesmo formato
+// das outras listagens paginadas (usuários, cartões...).
+async function listarPaginado(pagina = 1, limite = 10) {
+  const offset = (pagina - 1) * limite;
+  const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM horarios_acesso`);
+  const [linhas] = await pool.query(
+    `SELECT * FROM horarios_acesso ORDER BY id_horario LIMIT ? OFFSET ?`,
+    [limite, offset]
+  );
+  return { dados: linhas, total };
+}
+
 async function buscarPorId(idHorario) {
   const [linhas] = await pool.query(
     `SELECT * FROM horarios_acesso WHERE id_horario = ?`,
@@ -73,6 +85,7 @@ async function existeRegraValidaAgora(idUsuario, idDispositivo, diaSemana, horaA
 
 module.exports = {
   listarTodos,
+  listarPaginado,
   buscarPorId,
   listarPorUsuario,
   criar,

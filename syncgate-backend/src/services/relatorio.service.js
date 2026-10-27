@@ -118,7 +118,27 @@ async function resumoGeral() {
     LIMIT 5
   `);
 
+  // Contagens dos cards do Dashboard (uma consulta só, com
+  // subconsultas, para não fazer quatro idas ao banco).
+  const [[contagens]] = await pool.query(`
+    SELECT
+      (SELECT COUNT(*) FROM usuarios)                                 AS total_usuarios,
+      (SELECT COUNT(*) FROM cartoes WHERE ativo = 1)                  AS cartoes_ativos,
+      (SELECT COUNT(*) FROM dispositivos WHERE status = 'online')     AS dispositivos_online,
+      (SELECT COUNT(*) FROM solicitacao_acesso WHERE status = 'pendente') AS solicitacoes_pendentes
+  `);
+
   return {
+    // Campos usados pelos cards do Dashboard. Antes eles não eram
+    // enviados, e o painel mostrava 0 em todos os cards.
+    totalUsuarios: Number(contagens.total_usuarios) || 0,
+    totalCartoesAtivos: Number(contagens.cartoes_ativos) || 0,
+    dispositivosOnline: Number(contagens.dispositivos_online) || 0,
+    solicitacoesPendentes: Number(contagens.solicitacoes_pendentes) || 0,
+    acessosHoje: Number(hoje.total) || 0,
+    permitidosHoje: Number(hoje.permitidos) || 0,
+    negadosHoje: Number(hoje.negados) || 0,
+
     totais: {
       acessos: Number(totais.total_acessos) || 0,
       permitidos: Number(totais.total_permitidos) || 0,

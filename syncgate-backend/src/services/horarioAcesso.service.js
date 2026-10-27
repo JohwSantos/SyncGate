@@ -24,6 +24,10 @@ async function listar() {
   return horarioModel.listarTodos();
 }
 
+async function listarPaginado(pagina, limite) {
+  return horarioModel.listarPaginado(pagina, limite);
+}
+
 async function listarPorUsuario(idUsuario) {
   const usuario = await usuarioModel.buscarPorId(idUsuario);
   if (!usuario) {
@@ -90,6 +94,7 @@ async function remover(idHorario) {
 
 module.exports = {
   listar,
+  listarPaginado,
   listarPorUsuario,
   criar,
   remover,

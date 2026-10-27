@@ -12,6 +12,10 @@ async function listar() {
   return solicitacaoModel.listarTodos();
 }
 
+async function listarPaginado(pagina, limite) {
+  return solicitacaoModel.listarPaginado(pagina, limite);
+}
+
 async function buscarPorId(id) {
   const solicitacao = await solicitacaoModel.buscarPorId(id);
   if (!solicitacao) {
@@ -73,6 +77,7 @@ async function rejeitar(id) {
 
 module.exports = {
   listar,
+  listarPaginado,
   buscarPorId,
   criar,
   aprovar,

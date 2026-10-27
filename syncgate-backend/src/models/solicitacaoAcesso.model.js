@@ -7,6 +7,20 @@ async function listarTodos() {
   return linhas;
 }
 
+// Versão paginada: devolve { dados, total }. Mais recentes primeiro;
+// id_solicitacao desempata pedidos feitos no mesmo dia.
+async function listarPaginado(pagina = 1, limite = 10) {
+  const offset = (pagina - 1) * limite;
+  const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM solicitacao_acesso`);
+  const [linhas] = await pool.query(
+    `SELECT * FROM solicitacao_acesso
+      ORDER BY data_solicitacao DESC, id_solicitacao DESC
+      LIMIT ? OFFSET ?`,
+    [limite, offset]
+  );
+  return { dados: linhas, total };
+}
+
 async function buscarPorId(idSolicitacao) {
   const [linhas] = await pool.query(
     `SELECT * FROM solicitacao_acesso WHERE id_solicitacao = ?`,
@@ -43,6 +57,7 @@ async function definirStatus(idSolicitacao, status) {
 
 module.exports = {
   listarTodos,
+  listarPaginado,
   buscarPorId,
   criar,
   definirStatus,

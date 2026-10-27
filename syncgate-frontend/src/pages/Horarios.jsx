@@ -4,6 +4,7 @@ import api from '../api/client';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
 import EstadoVazio from '../components/EstadoVazio';
+import Paginacao from '../components/Paginacao';
 import ModalConfirmacao from '../components/ModalConfirmacao';
 import { usePermissoes } from '../hooks/usePermissoes';
 
@@ -30,19 +31,33 @@ export default function Horarios() {
   const [erroLista, setErroLista] = useState(null);
   const [erroAcao, setErroAcao] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
   const [regraExclusao, setRegraExclusao] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
 
-  async function carregarDados() {
+  // Carrega uma página de regras (10 por vez). Usuários e
+  // dispositivos vêm completos, porque são usados para mostrar os
+  // nomes na tabela e nas listas do formulário.
+  async function carregarDados(pag = pagina) {
     try {
       setCarregando(true);
-      const [listaHorarios, listaUsuarios, listaDispositivos] = await Promise.all([
-        api.get('/horarios'),
+      const [respHorarios, listaUsuarios, listaDispositivos] = await Promise.all([
+        api.get(`/horarios?pagina=${pag}&limite=10`),
         api.get('/usuarios'),
         api.get('/dispositivos'),
       ]);
-      setHorarios(listaHorarios);
+      // Se a página ficou vazia (ex.: apagou a última regra dela),
+      // volta para a anterior.
+      if (respHorarios.dados.length === 0 && pag > 1) {
+        return carregarDados(pag - 1);
+      }
+      setHorarios(respHorarios.dados);
+      setPagina(respHorarios.pagina);
+      setTotalPaginas(respHorarios.totalPaginas);
+      setTotalRegistros(respHorarios.total);
       setUsuarios(listaUsuarios);
       setDispositivos(listaDispositivos);
       setErroLista(null);
@@ -54,7 +69,7 @@ export default function Horarios() {
   }
 
   useEffect(() => {
-    carregarDados();
+    carregarDados(1);
   }, []);
 
   function nomeDoUsuario(idUsuario) {
@@ -72,8 +87,8 @@ export default function Horarios() {
     setExcluindo(true);
     try {
       await api.delete(`/horarios/${regraExclusao.id_horario}`);
-      setHorarios((atual) => atual.filter((h) => h.id_horario !== regraExclusao.id_horario));
       setRegraExclusao(null);
+      carregarDados(pagina);
     } catch (erro) {
       setErroAcao(erro.message);
       setRegraExclusao(null);
@@ -82,9 +97,9 @@ export default function Horarios() {
     }
   }
 
-  function aoCriar(horarioCriado) {
-    setHorarios((atual) => [...atual, horarioCriado]);
+  function aoCriar() {
     setModalAberto(false);
+    carregarDados(pagina);
   }
 
   return (
@@ -177,6 +192,12 @@ export default function Horarios() {
               )}
             </tbody>
           </table>
+          <Paginacao
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            total={totalRegistros}
+            aoMudar={carregarDados}
+          />
         </div>
       ) : null}
 
