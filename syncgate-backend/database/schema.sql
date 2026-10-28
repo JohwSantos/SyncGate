@@ -151,15 +151,18 @@ CREATE TABLE acesso (
   id_usuario      INT NULL,
   id_cartao       INT NULL,
   id_dispositivo  INT NOT NULL,
+  -- 'offline' = decidido pelo próprio leitor, sem internet (RNF08),
+  -- e enviado para a API quando a conexão voltou.
+  origem          ENUM('online', 'offline') NOT NULL DEFAULT 'online',
 
   CONSTRAINT fk_acesso_usuario
     FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario)
-    ON DELETE SET NULL
+    ON DELETE RESTRICT
     ON UPDATE CASCADE,
 
   CONSTRAINT fk_acesso_cartao
     FOREIGN KEY (id_cartao) REFERENCES cartoes (id_cartao)
-    ON DELETE SET NULL
+    ON DELETE RESTRICT
     ON UPDATE CASCADE,
 
   CONSTRAINT fk_acesso_dispositivo
@@ -173,6 +176,18 @@ CREATE TABLE acesso (
 CREATE INDEX idx_acesso_usuario ON acesso (id_usuario);
 CREATE INDEX idx_acesso_dispositivo ON acesso (id_dispositivo);
 CREATE INDEX idx_acesso_data_hora ON acesso (data_hora);
+
+-- RN08: o histórico de acessos não pode ser alterado nem apagado.
+-- As chaves acima usam RESTRICT (quem tem histórico só pode ser
+-- bloqueado, não excluído) e estes triggers recusam qualquer
+-- UPDATE ou DELETE direto na tabela, venha de onde vier.
+CREATE TRIGGER trg_acesso_bloqueia_update BEFORE UPDATE ON acesso
+  FOR EACH ROW SIGNAL SQLSTATE '45000'
+  SET MESSAGE_TEXT = 'RN08: registros de acesso nao podem ser alterados';
+
+CREATE TRIGGER trg_acesso_bloqueia_delete BEFORE DELETE ON acesso
+  FOR EACH ROW SIGNAL SQLSTATE '45000'
+  SET MESSAGE_TEXT = 'RN08: registros de acesso nao podem ser excluidos';
 
 
 -- ------------------------------------------------------------

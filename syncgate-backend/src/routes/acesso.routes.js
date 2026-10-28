@@ -20,6 +20,12 @@ const router = express.Router();
 // verdade passaria a ser bloqueada. Assim, só leituras autenticadas contam.
 router.post('/validar', autenticarDispositivo, limitadorDispositivo, acessoController.validar);
 
+// Modo offline (RNF08), também só para o dispositivo com a chave:
+// POST /api/acesso/cartoes-autorizados -> lista que o leitor guarda
+// POST /api/acesso/offline             -> acessos decididos sem internet
+router.post('/cartoes-autorizados', autenticarDispositivo, limitadorDispositivo, acessoController.cartoesAutorizados);
+router.post('/offline', autenticarDispositivo, limitadorDispositivo, acessoController.offline);
+
 // GET /api/acesso     -> histórico completo (RF10) — só para o painel,
 // GET /api/acesso/:id -> por isso exige login.
 router.get('/', verificarToken, acessoController.listar);

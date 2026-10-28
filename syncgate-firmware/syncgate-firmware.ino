@@ -8,12 +8,19 @@
 //   4. Envia o UID para a API do SyncGate (/api/acesso/validar),
 //      se identificando com a chave secreta deste dispositivo.
 //      Funciona com http:// (testes no PC) e https:// (Azure).
-//   5. Acende o LED verde (permitido) ou vermelho (negado) e
-//      toca o buzzer, conforme a resposta da API.
+//   5. Permitido: aciona o relé da catraca (RF05), acende o LED
+//      verde e toca o buzzer. Negado: LED vermelho e dois bipes.
+//   6. Mostra no Monitor Serial quanto tempo a decisão levou (RNF01).
 //
-// Quem decide se o acesso é permitido é SEMPRE a API — o ESP32
-// só lê o cartão e mostra o resultado. Assim, bloquear um usuário
-// no painel vale na hora, sem precisar reprogramar o dispositivo.
+// Quem decide se o acesso é permitido é a API — assim, bloquear um
+// usuário no painel vale na hora, sem reprogramar o dispositivo.
+//
+// MODO OFFLINE (RNF08)
+// De 5 em 5 minutos o ESP32 baixa da API a lista de cartões
+// autorizados (com as janelas de horário) e guarda na memória flash.
+// Se a API ficar fora de alcance, ele decide sozinho com essa lista
+// e anota cada passagem numa fila, que é enviada para o histórico
+// assim que a conexão volta. O relógio vem da internet (NTP).
 //
 // CONFIGURAÇÃO PELO CELULAR (WiFiManager)
 // Sem Wi-Fi salvo (ou faltando a chave), o ESP32 cria a rede
@@ -38,6 +45,8 @@
 #include <WiFiManager.h>
 #include <MFRC522.h>
 #include <ArduinoJson.h>
+#include <LittleFS.h>
+#include <time.h>
 
 // Valores padrão (API, ID, chave, senha do portal).
 // Se der erro "config.h: No such file", copie o config.example.h
@@ -59,6 +68,15 @@ const int PINO_RFID_RST  = 22;
 const int PINO_LED_VERDE    = 2;   // com resistor de 220 Ω
 const int PINO_LED_VERMELHO = 4;   // com resistor de 220 Ω
 const int PINO_BUZZER       = 15;
+
+// Relé que libera a catraca (RF05). Sem o módulo ligado, nada
+// acontece no pino 26 e o LED verde aceso mostra a liberação.
+const int PINO_RELE = 26;
+// Módulos relé de 1 canal vêm em dois tipos. Se o relé ficar
+// ligado o tempo todo e desligar ao passar o cartão, troque para false.
+const bool RELE_ATIVA_EM_NIVEL_ALTO = true;
+// Quanto tempo a catraca fica liberada para a pessoa passar.
+const unsigned long TEMPO_LIBERACAO_MS = 3000;
 
 // Botão BOOT da própria placa (GPIO 0). Segurar por 5 s apaga a
 // configuração e reabre a página de configuração.
@@ -92,6 +110,20 @@ const unsigned long TEMPO_RESET_MS = 5000;
 // A cada quanto tempo conferir se o Wi-Fi caiu.
 const unsigned long INTERVALO_RECONEXAO_MS = 5000;
 
+// Tempo máximo para abrir a conexão com a API. Curto de propósito:
+// se o servidor não responder, o leitor passa a decidir offline
+// sem deixar a pessoa esperando na catraca.
+const int TIMEOUT_CONEXAO_MS = 2500;
+
+// Modo offline: de quanto em quanto tempo atualizar a lista de
+// cartões e tentar enviar a fila de acessos guardados.
+const unsigned long INTERVALO_LISTA_MS = 5UL * 60 * 1000;
+const unsigned long INTERVALO_FILA_MS  = 30UL * 1000;
+// Tamanho máximo da fila na flash (~1500 passagens).
+const size_t TAMANHO_MAXIMO_FILA = 64 * 1024;
+const char *ARQUIVO_LISTA = "/cartoes.json";
+const char *ARQUIVO_FILA  = "/fila.jsonl";
+
 // ---- Tipos ---------------------------------------------------
 // Resultado da consulta à API.
 // Precisa ficar AQUI EM CIMA, antes de qualquer função: o Arduino
@@ -99,7 +131,8 @@ const unsigned long INTERVALO_RECONEXAO_MS = 5000;
 // começo do arquivo — se o enum viesse depois, a declaração de
 // validarNaApi() usaria um tipo que ainda não existe e daria o
 // erro "'Resultado' does not name a type".
-enum Resultado { PERMITIDO, NEGADO, ERRO };
+// SEM_CONEXAO = a API não respondeu: hora de decidir offline.
+enum Resultado { PERMITIDO, NEGADO, ERRO, SEM_CONEXAO };
 
 // ---- Variáveis globais ---------------------------------------
 MFRC522 leitor(PINO_RFID_SS, PINO_RFID_RST);
@@ -116,6 +149,11 @@ Preferences memoria;
 String ultimoUid = "";
 unsigned long momentoUltimaLeitura = 0;
 unsigned long momentoUltimaVerificacaoWifi = 0;
+
+// Lista de cartões autorizados (cópia em RAM do ARQUIVO_LISTA).
+JsonDocument listaCartoes;
+unsigned long momentoUltimaLista = 0;
+unsigned long momentoUltimoEnvioFila = 0;
 
 
 // ============================================================
@@ -140,11 +178,18 @@ void bipe(int frequencia, int duracaoMs) {
   }
 }
 
-// Acesso PERMITIDO: LED verde aceso + um bipe agudo e curto.
-void sinalPermitido() {
+void acionarRele(bool ligado) {
+  digitalWrite(PINO_RELE, ligado == RELE_ATIVA_EM_NIVEL_ALTO ? HIGH : LOW);
+}
+
+// Acesso PERMITIDO (RF05): libera a catraca pelo relé durante
+// TEMPO_LIBERACAO_MS, com o LED verde aceso + um bipe agudo e curto.
+void liberarCatraca() {
+  acionarRele(true);
   digitalWrite(PINO_LED_VERDE, HIGH);
   bipe(2000, 150);
-  delay(1350);
+  delay(TEMPO_LIBERACAO_MS - 150);
+  acionarRele(false);
   apagarLeds();
 }
 
@@ -251,7 +296,9 @@ void conectarWifi() {
   // (ex.: senha digitada errada) — assim não precisa preencher tudo de novo.
   gerenciador.setBreakAfterConfig(true);
   gerenciador.setConnectTimeout(20);
-  gerenciador.setConfigPortalTimeout(TEMPO_PORTAL_S);
+  // Já configurado (só o Wi-Fi está fora): a página fica aberta por
+  // menos tempo, e depois a catraca segue funcionando offline.
+  gerenciador.setConfigPortalTimeout(configuracaoCompleta() ? 60 : TEMPO_PORTAL_S);
 
   String nomeRede = nomeRedeConfiguracao();
 
@@ -301,12 +348,22 @@ void conectarWifi() {
     configuracaoFoiSalva = false;
   }
 
-  if (!conectado || !configuracaoCompleta()) {
-    // Ninguém configurou a tempo, o Wi-Fi não conectou, ou ainda
-    // falta algum campo: reinicia e tenta de novo do começo.
-    Serial.println("[WiFi] Sem Wi-Fi ou configuracao incompleta. Reiniciando em 3 s...");
+  if (!configuracaoCompleta()) {
+    // Ninguém configurou a tempo ou ainda falta algum campo:
+    // reinicia e tenta de novo do começo.
+    Serial.println("[WiFi] Configuracao incompleta. Reiniciando em 3 s...");
     delay(3000);
     ESP.restart();
+  }
+
+  if (!conectado) {
+    // Configurado, mas o Wi-Fi não está disponível agora (RNF08):
+    // segue funcionando com a lista local e reconecta sozinho depois.
+    Serial.println("[WiFi] Sem Wi-Fi. Funcionando OFFLINE com a lista local; tentando reconectar em segundo plano.");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(); // usa o Wi-Fi salvo
+    WiFi.setAutoReconnect(true);
+    return;
   }
 
   // Se o Wi-Fi cair depois, o próprio ESP32 tenta reconectar.
@@ -391,10 +448,55 @@ bool leitorRespondendo() {
 // Comunicação com a API
 // ============================================================
 
+// Envia um JSON por POST para a API e devolve o código HTTP
+// (negativo = nem conseguiu falar com o servidor).
+// http:// usa uma conexão comum; https:// usa uma conexão segura
+// que confere o certificado do servidor contra os certificados
+// raiz de certificados.h. Se o servidor não for quem diz ser, a
+// conexão falha — os dados nunca chegam a um impostor.
+int postarJson(const String &url, const String &corpo, String &resposta) {
+  WiFiClient clienteComum;
+  WiFiClientSecure clienteSeguro;
+  HTTPClient http;
+  http.setConnectTimeout(TIMEOUT_CONEXAO_MS);
+  http.setTimeout(TIMEOUT_API_MS);
+
+  bool iniciou;
+  if (url.startsWith("https://")) {
+    clienteSeguro.setCACert(CERTIFICADOS_RAIZ);
+    iniciou = http.begin(clienteSeguro, url);
+  } else {
+    iniciou = http.begin(clienteComum, url);
+  }
+
+  if (!iniciou) {
+    Serial.printf("[API] Endereco invalido: %s\n", url.c_str());
+    return HTTPC_ERROR_CONNECTION_REFUSED;
+  }
+
+  http.addHeader("Content-Type", "application/json");
+  // A chave secreta prova para a API que este é mesmo o
+  // dispositivo cadastrado (sem ela, a API responde 401).
+  http.addHeader("X-Dispositivo-Chave", chaveDispositivo);
+
+  int codigo = http.POST(corpo);
+  resposta = codigo > 0 ? http.getString() : "";
+  http.end();
+  return codigo;
+}
+
+// As outras rotas do leitor ficam ao lado de /validar:
+// ".../api/acesso/validar" -> ".../api/acesso/<rota>"
+String urlDaRota(const char *rota) {
+  int fim = apiUrl.lastIndexOf("/validar");
+  if (fim < 0) return "";
+  return apiUrl.substring(0, fim + 1) + rota;
+}
+
 Resultado validarNaApi(const String &uid) {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[API] Sem Wi-Fi, nao da para validar.");
-    return ERRO;
+    Serial.println("[API] Sem Wi-Fi.");
+    return SEM_CONEXAO;
   }
 
   // Monta o corpo da requisição: {"uid":"A1B2C3D4","id_dispositivo":1}
@@ -404,43 +506,14 @@ Resultado validarNaApi(const String &uid) {
   String corpo;
   serializeJson(pedido, corpo);
 
-  // http:// usa uma conexão comum; https:// usa uma conexão segura
-  // que confere o certificado do servidor contra os certificados
-  // raiz de certificados.h. Se o servidor não for quem diz ser, a
-  // conexão falha — os dados nunca chegam a um impostor.
-  WiFiClient clienteComum;
-  WiFiClientSecure clienteSeguro;
-  HTTPClient http;
-  http.setTimeout(TIMEOUT_API_MS);
-
-  bool iniciou;
-  if (apiUrl.startsWith("https://")) {
-    clienteSeguro.setCACert(CERTIFICADOS_RAIZ);
-    iniciou = http.begin(clienteSeguro, apiUrl);
-  } else {
-    iniciou = http.begin(clienteComum, apiUrl);
-  }
-
-  if (!iniciou) {
-    Serial.printf("[API] Endereco invalido: %s\n", apiUrl.c_str());
-    return ERRO;
-  }
-
-  http.addHeader("Content-Type", "application/json");
-  // A chave secreta prova para a API que este é mesmo o
-  // dispositivo cadastrado (sem ela, a API responde 401).
-  http.addHeader("X-Dispositivo-Chave", chaveDispositivo);
-
-  int codigo = http.POST(corpo);
-  String resposta = http.getString();
-  http.end();
+  String resposta;
+  int codigo = postarJson(apiUrl, corpo, resposta);
 
   // Códigos negativos = nem chegou a falar com a API
-  // (endereço errado, servidor fora do ar, certificado recusado...).
+  // (servidor fora do ar, internet caiu, certificado recusado...).
   if (codigo <= 0) {
     Serial.printf("[API] Falha de conexao: %s\n", HTTPClient::errorToString(codigo).c_str());
-    Serial.println("      Confira o endereco da API e se o backend esta no ar.");
-    return ERRO;
+    return SEM_CONEXAO;
   }
 
   if (codigo == 401) {
@@ -481,6 +554,151 @@ Resultado validarNaApi(const String &uid) {
 
 
 // ============================================================
+// Modo offline (RNF08)
+// ============================================================
+
+// O relógio só está certo depois de sincronizar pela internet (NTP).
+bool relogioCerto() {
+  return time(nullptr) > 1700000000; // depois de nov/2023
+}
+
+void carregarListaDoArquivo() {
+  File arquivo = LittleFS.open(ARQUIVO_LISTA, "r");
+  if (!arquivo) {
+    Serial.println("[Offline] Ainda nao ha lista local de cartoes.");
+    return;
+  }
+  if (deserializeJson(listaCartoes, arquivo)) {
+    Serial.println("[Offline] Lista local corrompida; sera baixada de novo.");
+    listaCartoes.clear();
+  } else {
+    Serial.printf("[Offline] Lista local carregada: %d cartao(oes).\n", listaCartoes["cartoes"].size());
+  }
+  arquivo.close();
+}
+
+// Baixa da API a lista de cartões autorizados e guarda na flash.
+void atualizarLista() {
+  momentoUltimaLista = millis();
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  String resposta;
+  int codigo = postarJson(urlDaRota("cartoes-autorizados"), "{\"id_dispositivo\":" + String(idDispositivo) + "}", resposta);
+  if (codigo != 200) {
+    Serial.printf("[Offline] Nao foi possivel atualizar a lista (HTTP %d).\n", codigo);
+    return;
+  }
+
+  JsonDocument nova;
+  if (deserializeJson(nova, resposta) || !nova["cartoes"].is<JsonArray>()) {
+    Serial.println("[Offline] Lista recebida invalida.");
+    return;
+  }
+
+  File arquivo = LittleFS.open(ARQUIVO_LISTA, "w");
+  if (arquivo) {
+    arquivo.print(resposta);
+    arquivo.close();
+  }
+  listaCartoes = nova;
+  Serial.printf("[Offline] Lista atualizada: %d cartao(oes).\n", listaCartoes["cartoes"].size());
+}
+
+// Decide sem a API, com a lista local: o mesmo que a API faria
+// para cartão ativo, dentro da validade, dono ativo e horário (RN06).
+Resultado decidirOffline(const String &uid) {
+  for (JsonObject cartao : listaCartoes["cartoes"].as<JsonArray>()) {
+    if (uid != cartao["uid"].as<const char *>()) continue;
+
+    // Sem janelas de horário: o dono pode passar a qualquer hora.
+    if (!cartao["h"].is<JsonArray>()) return PERMITIDO;
+
+    // Com horário restrito, só dá para conferir com o relógio certo.
+    struct tm agora;
+    if (!relogioCerto() || !getLocalTime(&agora, 10)) {
+      Serial.println("[Offline] Relogio nao sincronizado: nao da para conferir o horario.");
+      return NEGADO;
+    }
+    char hora[9];
+    strftime(hora, sizeof(hora), "%H:%M:%S", &agora);
+    // Cada janela: [dia da semana (0 = domingo), "HH:MM:SS", "HH:MM:SS"]
+    for (JsonArray janela : cartao["h"].as<JsonArray>()) {
+      if (janela[0].as<int>() == agora.tm_wday &&
+          strcmp(hora, janela[1].as<const char *>()) >= 0 &&
+          strcmp(hora, janela[2].as<const char *>()) <= 0) {
+        return PERMITIDO;
+      }
+    }
+    return NEGADO;
+  }
+  return NEGADO; // não está na lista: desconhecido, inativo, bloqueado...
+}
+
+// Anota a passagem decidida offline, para mandar ao histórico depois.
+void guardarNaFila(const String &uid, bool permitido) {
+  File arquivo = LittleFS.open(ARQUIVO_FILA, "a");
+  if (!arquivo) return;
+  if (arquivo.size() >= TAMANHO_MAXIMO_FILA) {
+    Serial.println("[Offline] Fila cheia! Esta passagem nao sera registrada no historico.");
+    arquivo.close();
+    return;
+  }
+  // t = 0: relógio ainda não sincronizado (a API usa a hora de chegada).
+  long instante = relogioCerto() ? (long)time(nullptr) : 0;
+  arquivo.printf("{\"uid\":\"%s\",\"t\":%ld,\"p\":%s}\n", uid.c_str(), instante, permitido ? "true" : "false");
+  arquivo.close();
+}
+
+// Envia a fila para a API, em lotes de até 100 passagens. Só apaga
+// do arquivo o que a API confirmou ter recebido.
+void enviarFila() {
+  momentoUltimoEnvioFila = millis();
+  if (WiFi.status() != WL_CONNECTED || !LittleFS.exists(ARQUIVO_FILA)) return;
+
+  File arquivo = LittleFS.open(ARQUIVO_FILA, "r");
+  if (!arquivo) return;
+
+  JsonDocument pedido;
+  pedido["id_dispositivo"] = idDispositivo;
+  JsonArray registros = pedido["registros"].to<JsonArray>();
+  String resto;
+  while (arquivo.available()) {
+    String linha = arquivo.readStringUntil('\n');
+    if (linha.length() == 0) continue;
+    if (registros.size() < 100) {
+      JsonDocument item;
+      if (!deserializeJson(item, linha)) registros.add(item);
+    } else {
+      resto += linha + "\n";
+    }
+  }
+  arquivo.close();
+
+  if (registros.size() == 0) {
+    LittleFS.remove(ARQUIVO_FILA);
+    return;
+  }
+
+  String corpo, resposta;
+  serializeJson(pedido, corpo);
+  int codigo = postarJson(urlDaRota("offline"), corpo, resposta);
+  if (codigo != 200) {
+    Serial.printf("[Offline] Fila nao enviada (HTTP %d); tento de novo depois.\n", codigo);
+    return;
+  }
+
+  Serial.printf("[Offline] %d passagem(ns) enviada(s) ao historico: %s\n", registros.size(), resposta.c_str());
+  if (resto.length() == 0) {
+    LittleFS.remove(ARQUIVO_FILA);
+  } else {
+    File novo = LittleFS.open(ARQUIVO_FILA, "w");
+    novo.print(resto);
+    novo.close();
+  }
+}
+
+
+// ============================================================
 // setup() roda uma vez quando o ESP32 liga
 // ============================================================
 void setup() {
@@ -493,7 +711,15 @@ void setup() {
   pinMode(PINO_LED_VERMELHO, OUTPUT);
   pinMode(PINO_BUZZER, OUTPUT);
   pinMode(PINO_BOTAO_RESET, INPUT_PULLUP);
+  pinMode(PINO_RELE, OUTPUT);
+  acionarRele(false); // catraca travada ao ligar
   apagarLeds();
+
+  // Memória flash onde ficam a lista de cartões e a fila offline.
+  // true = formata na primeira vez (placa nova).
+  if (!LittleFS.begin(true)) {
+    Serial.println("[Offline] Falha ao abrir a memoria flash: modo offline desativado.");
+  }
 
   // Inicia o barramento SPI com os pinos definidos lá em cima
   // e depois o leitor RC522.
@@ -515,6 +741,14 @@ void setup() {
 
   conectarWifi();
 
+  // Relógio pela internet, no horário de Brasília (UTC-3, sem horário
+  // de verão). Necessário para conferir horários e datar a fila offline.
+  configTzTime("<-03>3", "pool.ntp.org", "a.st1.ntp.br");
+
+  carregarListaDoArquivo();
+  atualizarLista();
+  enviarFila();
+
   Serial.printf("[SyncGate] Dispositivo %d pronto.\n", idDispositivo);
   Serial.println("[SyncGate] Aproxime um cartao do leitor...");
   bipe(1500, 80); // bipe curto de "pronto"
@@ -527,6 +761,12 @@ void setup() {
 void loop() {
   verificarBotaoReset();
   manterWifi();
+
+  // Tarefas do modo offline, só com Wi-Fi.
+  if (WiFi.status() == WL_CONNECTED) {
+    if (millis() - momentoUltimaLista >= INTERVALO_LISTA_MS) atualizarLista();
+    if (millis() - momentoUltimoEnvioFila >= INTERVALO_FILA_MS) enviarFila();
+  }
 
   // Nenhum cartão novo encostado? Volta e espera.
   if (!leitor.PICC_IsNewCardPresent() || !leitor.PICC_ReadCardSerial()) {
@@ -551,16 +791,30 @@ void loop() {
 
   Serial.printf("\n[RFID] Cartao lido. UID: %s\n", uid.c_str());
 
-  switch (validarNaApi(uid)) {
+  // RNF01: tempo entre a leitura do cartão e a decisão.
+  unsigned long inicio = millis();
+  Resultado resultado = validarNaApi(uid);
+  const char *modo = "online";
+
+  if (resultado == SEM_CONEXAO) {
+    // API fora de alcance: decide com a lista local e anota na fila.
+    resultado = decidirOffline(uid);
+    guardarNaFila(uid, resultado == PERMITIDO);
+    modo = "offline";
+    Serial.printf("[Offline] %s pela lista local (sera enviado ao historico depois).\n",
+                  resultado == PERMITIDO ? "PERMITIDO" : "NEGADO");
+  }
+
+  Serial.printf("[Tempo] Decisao %s em %lu ms\n", modo, millis() - inicio);
+
+  switch (resultado) {
     case PERMITIDO:
-      sinalPermitido();
-      // Aqui é onde, no futuro, um relé acionaria a catraca, ex.:
-      //   digitalWrite(PINO_RELE, HIGH); delay(1000); digitalWrite(PINO_RELE, LOW);
+      liberarCatraca();
       break;
     case NEGADO:
       sinalNegado();
       break;
-    case ERRO:
+    default: // ERRO (chave errada, limite de leituras, resposta estranha)
       sinalErro();
       break;
   }

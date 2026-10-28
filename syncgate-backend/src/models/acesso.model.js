@@ -79,18 +79,35 @@ async function registrar(dados) {
   const {
     tipo_movimento, status, motivo_negado = null,
     id_usuario = null, id_cartao = null, id_dispositivo,
+    data_hora = new Date(), origem = 'online',
   } = dados;
 
+  // data_hora vem do leitor nos acessos offline (a hora em que a
+  // pessoa passou, não a hora em que o registro chegou).
   const [resultado] = await pool.query(
-    `INSERT INTO acesso (tipo_movimento, status, motivo_negado, id_usuario, id_cartao, id_dispositivo)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [tipo_movimento, status, motivo_negado, id_usuario, id_cartao, id_dispositivo]
+    `INSERT INTO acesso (data_hora, tipo_movimento, status, motivo_negado, id_usuario, id_cartao, id_dispositivo, origem)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [data_hora, tipo_movimento, status, motivo_negado, id_usuario, id_cartao, id_dispositivo, origem]
   );
 
   return buscarPorId(resultado.insertId);
 }
 
+// Um registro offline já recebido? O leitor reenvia a fila se a
+// resposta se perder no caminho; isso evita gravar a passagem duas vezes.
+async function existeOffline({ id_dispositivo, data_hora, id_cartao, status }) {
+  const [linhas] = await pool.query(
+    `SELECT 1 FROM acesso
+      WHERE origem = 'offline' AND id_dispositivo = ? AND data_hora = ?
+        AND id_cartao <=> ? AND status = ?
+      LIMIT 1`,
+    [id_dispositivo, data_hora, id_cartao, status]
+  );
+  return linhas.length > 0;
+}
+
 module.exports = {
+  existeOffline,
   listarTodos,
   listarPaginado,
   buscarPorId,

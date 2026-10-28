@@ -223,6 +223,116 @@ async function validarAcesso({ uid, id_dispositivo }) {
   return resultado;
 }
 
+// ---- Modo offline (RNF08) -------------------------------------
+
+// Dia da semana no formato do tm_wday do ESP32 (domingo = 0).
+const DIA_NUMERO = { dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6 };
+
+// Lista que o leitor guarda para decidir sozinho quando ficar sem
+// internet. Cada cartão leva as janelas de horário que valem NESTE
+// dispositivo; sem o campo "h", o dono não tem restrição de horário.
+// Quem tem regras, mas nenhuma para este leitor, fica fora da lista
+// (seria negado online também).
+async function listarCartoesAutorizados(idDispositivo) {
+  const dispositivo = await dispositivoModel.buscarPorId(idDispositivo);
+  if (!dispositivo) throw erroComStatus('Dispositivo não encontrado', 404);
+  await registrarComunicacao(dispositivo);
+
+  // Em manutenção não libera ninguém, nem offline.
+  if (dispositivo.status === 'manutencao') return { cartoes: [] };
+
+  const [cartoes, regras] = await Promise.all([
+    cartaoModel.listarAutorizados(),
+    horarioModel.listarTodos(),
+  ]);
+
+  const regrasPorUsuario = new Map();
+  for (const regra of regras) {
+    if (!regrasPorUsuario.has(regra.id_usuario)) regrasPorUsuario.set(regra.id_usuario, []);
+    regrasPorUsuario.get(regra.id_usuario).push(regra);
+  }
+
+  const lista = [];
+  for (const cartao of cartoes) {
+    const doUsuario = regrasPorUsuario.get(cartao.id_usuario);
+    if (!doUsuario) {
+      lista.push({ uid: cartao.uid });
+      continue;
+    }
+    const janelas = doUsuario
+      .filter((r) => r.id_dispositivo === null || r.id_dispositivo === dispositivo.id_dispositivo)
+      .map((r) => [DIA_NUMERO[r.dia_semana], String(r.hora_inicio).slice(0, 8), String(r.hora_fim).slice(0, 8)]);
+    if (janelas.length) lista.push({ uid: cartao.uid, h: janelas });
+  }
+
+  return { cartoes: lista };
+}
+
+// Recebe os acessos que o leitor decidiu sozinho enquanto estava
+// sem internet e grava no histórico, com a hora em que aconteceram.
+// Formato: { registros: [{ uid, t: <segundos desde 1970>, p: true|false }] }
+async function registrarOffline(idDispositivo, registros) {
+  if (!Array.isArray(registros) || registros.length === 0 || registros.length > 500) {
+    throw erroComStatus('Envie de 1 a 500 registros em "registros"', 400);
+  }
+
+  const dispositivo = await dispositivoModel.buscarPorId(idDispositivo);
+  if (!dispositivo) throw erroComStatus('Dispositivo não encontrado', 404);
+  await registrarComunicacao(dispositivo);
+
+  const agora = Date.now();
+  const validos = [];
+  let ignorados = 0;
+
+  for (const item of registros) {
+    const uid = String((item && item.uid) || '').trim();
+    const t = Number(item && item.t);
+    // Hora no futuro (relógio do leitor errado) ou formato estranho: descarta.
+    if (!/^[A-Za-z0-9:_-]{1,32}$/.test(uid) || !Number.isInteger(t) || t < 0 || t * 1000 > agora + 5 * 60 * 1000) {
+      ignorados++;
+      continue;
+    }
+    // shortcut: t = 0 quando o leitor ligou sem internet e nunca acertou o relógio;
+    // gravamos a hora de chegada. Para melhorar, guardar millis() e corrigir no envio.
+    validos.push({ uid, data_hora: new Date(t > 0 ? t * 1000 : agora), permitido: item.p === true });
+  }
+
+  // Em ordem cronológica, para a alternância entrada/saída sair certa.
+  validos.sort((a, b) => a.data_hora - b.data_hora);
+
+  let inseridos = 0;
+  let duplicados = 0;
+
+  for (const item of validos) {
+    const cartao = await cartaoModel.buscarPorUid(item.uid);
+    const idUsuario = cartao ? cartao.id_usuario : null;
+    const idCartao = cartao ? cartao.id_cartao : null;
+    const status = item.permitido ? 'permitido' : 'negado';
+
+    if (await acessoModel.existeOffline({ id_dispositivo: idDispositivo, data_hora: item.data_hora, id_cartao: idCartao, status })) {
+      duplicados++;
+      continue;
+    }
+
+    const registro = await acessoModel.registrar({
+      tipo_movimento: await decidirTipoMovimento(idUsuario),
+      status,
+      motivo_negado: item.permitido
+        ? null
+        : cartao ? 'Negado pelo leitor sem conexão' : `UID não cadastrado: ${item.uid}`,
+      id_usuario: idUsuario,
+      id_cartao: idCartao,
+      id_dispositivo: idDispositivo,
+      data_hora: item.data_hora,
+      origem: 'offline',
+    });
+    inseridos++;
+    websocket.emitir('novo-acesso', { permitido: item.permitido, motivo: registro.motivo_negado, registro });
+  }
+
+  return { inseridos, duplicados, ignorados };
+}
+
 async function listar() {
   return acessoModel.listarTodos();
 }
@@ -241,6 +351,8 @@ async function buscarPorId(id) {
 
 module.exports = {
   validarAcesso,
+  listarCartoesAutorizados,
+  registrarOffline,
   listar,
   listarPaginado,
   buscarPorId,

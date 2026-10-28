@@ -83,7 +83,22 @@ async function remover(idCartao) {
   await pool.query(`DELETE FROM cartoes WHERE id_cartao = ?`, [idCartao]);
 }
 
+// Cartões que passariam pelas verificações 4 a 6 da validação
+// (ativo, dentro da validade, dono ativo). Usado para montar a
+// lista que o leitor guarda para funcionar sem internet (RNF08).
+async function listarAutorizados() {
+  const [linhas] = await pool.query(
+    `SELECT c.uid, c.id_usuario
+       FROM cartoes c
+       JOIN usuarios u ON u.id_usuario = c.id_usuario
+      WHERE c.ativo = 1 AND u.status = 1
+        AND (c.data_validade IS NULL OR c.data_validade >= CURDATE())`
+  );
+  return linhas;
+}
+
 module.exports = {
+  listarAutorizados,
   listarTodos,
   listarPaginado,
   buscarPorId,

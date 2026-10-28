@@ -61,6 +61,18 @@ Com um endereço `https://`, o ESP32 confere o certificado do servidor usando os
 | Buzzer (+) | GPIO 15 |
 | Pernas curtas dos LEDs e (−) do buzzer | GND |
 
+### Relé da catraca (RF05)
+
+| Módulo relé (1 canal, 5 V) | ESP32 |
+|---|---|
+| VCC | 5V (VIN) |
+| GND | GND |
+| IN | GPIO 26 |
+
+Os contatos **COM** e **NA** (normalmente aberto) do relé vão no lugar do botão de liberação da catraca ou da fechadura. Nunca ligue a fechadura direto no ESP32. Sem o módulo, a liberação aparece só no LED verde, que fica aceso durante os 3 s em que a catraca estaria liberada.
+
+Se o relé ficar ligado o tempo todo e desligar quando o cartão passa, o seu módulo é do tipo "aciona em nível baixo": troque `RELE_ATIVA_EM_NIVEL_ALTO` para `false` no começo do `.ino`.
+
 Se a sua ligação for diferente, mude os números no começo do `syncgate-firmware.ino` (seção **Pinos**).
 
 ## Sinais
@@ -70,10 +82,20 @@ Se a sua ligação for diferente, mude os números no começo do `syncgate-firmw
 | Modo de configuração (rede `SyncGate-XXXX` aberta) | verde **e** vermelho acesos | — |
 | Segurando o BOOT para apagar a configuração | vermelho piscando | bipe longo ao apagar |
 | Pronto para ler | — | 1 bipe curto |
-| Acesso **permitido** | verde aceso 1,5 s | 1 bipe agudo |
+| Acesso **permitido** (relé liga) | verde aceso 3 s | 1 bipe agudo |
 | Acesso **negado** (cartão bloqueado, vencido, fora do horário...) | vermelho aceso 1,5 s | 2 bipes graves |
-| **Problema** (sem Wi-Fi, API desligada, chave errada) | vermelho piscando 3× | 3 bipes curtos |
+| **Problema** (chave errada, limite de leituras) | vermelho piscando 3× | 3 bipes curtos |
 | RC522 não responde (fio solto) | vermelho piscando sem parar | bipes repetidos |
+
+## Modo offline (RNF08)
+
+- Ao ligar e a cada 5 minutos, o leitor baixa da API a lista de cartões autorizados, com os horários permitidos, e guarda na memória flash.
+- Se a API não responder (internet caiu, servidor fora do ar), ele decide com essa lista: mesmo sinal de permitido/negado e, no Monitor Serial, `[Offline] PERMITIDO pela lista local`.
+- Cada passagem offline fica numa fila na flash. Com a conexão de volta, a fila é enviada em até 30 s e aparece no Histórico com a etiqueta **Offline**, na hora em que aconteceu.
+- Cartões com restrição de horário precisam do relógio certo, que vem da internet (NTP). Se o leitor for ligado já sem internet, esses cartões são negados até a conexão voltar; os sem restrição passam normalmente.
+- Bloqueios feitos no painel só chegam ao leitor offline na próxima atualização da lista.
+
+O Monitor Serial também mostra o tempo de cada decisão, por exemplo `[Tempo] Decisao online em 184 ms` (RNF01).
 
 ## Passo a passo — primeira vez
 

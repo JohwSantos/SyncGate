@@ -5,6 +5,7 @@ import Paginacao from '../components/Paginacao';
 import Spinner from '../components/Spinner';
 import EstadoVazio from '../components/EstadoVazio';
 import BotoesCSV from '../components/BotoesCSV';
+import { usePermissoes } from '../hooks/usePermissoes';
 import { useSocket } from '../hooks/useSocket';
 
 function formatarDataHora(iso) {
@@ -12,6 +13,7 @@ function formatarDataHora(iso) {
 }
 
 export default function Historico() {
+  const { podeExportarDadosPessoais } = usePermissoes();
   const [acessos, setAcessos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [dispositivos, setDispositivos] = useState([]);
@@ -89,11 +91,13 @@ export default function Historico() {
           <p className="sg-page-subtitle">Acompanhe as entradas e saidas registradas em tempo real</p>
         </div>
         <div className="sg-page-actions">
-          <BotoesCSV 
-            rotaExportar="/csv/acesso/exportar" 
-            nomeArquivo="historico_acessos.csv" 
-            rotaImportar={null}
-          />
+          {podeExportarDadosPessoais && (
+            <BotoesCSV
+              rotaExportar="/csv/historico/exportar"
+              nomeArquivo="historico_acessos.csv"
+              rotaImportar={null}
+            />
+          )}
         </div>
       </div>
 
@@ -199,6 +203,12 @@ export default function Historico() {
                       texto={acesso.status === 'permitido' ? 'Permitido' : 'Negado'}
                       tom={acesso.status === 'permitido' ? 'sucesso' : 'perigo'}
                     />
+                    {/* Decidido pelo leitor sem internet (RNF08) */}
+                    {acesso.origem === 'offline' && (
+                      <span style={{ marginLeft: 'var(--sg-space-2)' }}>
+                        <Badge texto="Offline" tom="info" semPonto />
+                      </span>
+                    )}
                   </td>
                   <td data-rotulo="Motivo" style={{ color: 'var(--sg-text-2)' }}>
                     {acesso.motivo_negado || '—'}

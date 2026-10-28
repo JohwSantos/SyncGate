@@ -72,7 +72,7 @@ async function exportarHistorico() {
     SELECT a.id_acesso, a.data_hora, a.tipo_movimento, a.status,
            a.motivo_negado, a.id_usuario, u.nome AS nome_usuario,
            a.id_cartao, c.uid AS uid_cartao,
-           a.id_dispositivo, d.descricao AS dispositivo
+           a.id_dispositivo, d.descricao AS dispositivo, a.origem
       FROM acesso a
       LEFT JOIN usuarios u ON a.id_usuario = u.id_usuario
       LEFT JOIN cartoes c ON a.id_cartao = c.id_cartao
@@ -85,7 +85,7 @@ async function exportarHistorico() {
     columns: [
       'id_acesso', 'data_hora', 'tipo_movimento', 'status',
       'motivo_negado', 'id_usuario', 'nome_usuario',
-      'id_cartao', 'uid_cartao', 'id_dispositivo', 'dispositivo',
+      'id_cartao', 'uid_cartao', 'id_dispositivo', 'dispositivo', 'origem',
     ],
   });
 }

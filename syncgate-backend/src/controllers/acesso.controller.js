@@ -22,6 +22,24 @@ async function validar(req, res, next) {
   }
 }
 
+// POST /api/acesso/cartoes-autorizados  (ESP32 — modo offline)
+async function cartoesAutorizados(req, res, next) {
+  try {
+    res.json(await acessoService.listarCartoesAutorizados(Number(req.body.id_dispositivo)));
+  } catch (erro) {
+    next(erro);
+  }
+}
+
+// POST /api/acesso/offline  (ESP32 — envia a fila guardada sem internet)
+async function offline(req, res, next) {
+  try {
+    res.json(await acessoService.registrarOffline(Number(req.body.id_dispositivo), req.body.registros));
+  } catch (erro) {
+    next(erro);
+  }
+}
+
 async function listar(req, res, next) {
   try {
     if (req.query.pagina) {
@@ -53,6 +71,8 @@ async function buscarPorId(req, res, next) {
 
 module.exports = {
   validar,
+  cartoesAutorizados,
+  offline,
   listar,
   buscarPorId,
 };
