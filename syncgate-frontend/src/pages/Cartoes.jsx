@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from 'react';
-import { Plus, Lock, Unlock, Trash2, Search, CreditCard } from 'lucide-react';
+import { Plus, Lock, Unlock, Trash2, Search } from 'lucide-react';
 import api from '../api/client';
 import Modal from '../components/Modal';
 import Badge from '../components/Badge';

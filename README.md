@@ -38,7 +38,7 @@ docker compose up -d --build
 docker compose exec backend npm run seed:admin -- "Seu Nome" "12345678900" "admin" "suaSenha123"
 ```
 
-Painel em `http://localhost:5173`. Veja o `README-DOCKER.md` para detalhes.
+Painel em `http://localhost:5173`.
 
 ## Como rodar (manual)
 

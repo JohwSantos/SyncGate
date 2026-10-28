@@ -3,13 +3,6 @@ const { pool } = require('../config/database');
 // Model do log de acesso. É um log imutável (RN08): as funções
 // aqui só permitem criar (registrar) e ler — nunca UPDATE ou DELETE.
 
-async function listarTodos() {
-  const [linhas] = await pool.query(
-    `SELECT * FROM acesso ORDER BY data_hora DESC, id_acesso DESC`
-  );
-  return linhas;
-}
-
 async function listarPaginado(pagina = 1, limite = 15, filtros = {}) {
   const offset = (pagina - 1) * limite;
   const condicoes = [];
@@ -108,7 +101,6 @@ async function existeOffline({ id_dispositivo, data_hora, id_cartao, status }) {
 
 module.exports = {
   existeOffline,
-  listarTodos,
   listarPaginado,
   buscarPorId,
   buscarUltimoPermitidoPorUsuario,

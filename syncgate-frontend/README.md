@@ -2,7 +2,7 @@
 
 Painel web em React (Vite) para o sistema de controle de acesso SyncGate.
 
-> **Status:** completo. As 7 telas de gestão estão funcionais, com atualização em tempo real e layout responsivo.
+> **Status:** completo. As 8 telas de gestão estão funcionais, com atualização em tempo real e layout responsivo.
 
 ## Tecnologias
 
@@ -25,7 +25,8 @@ src/
 ├── components/
 │   ├── Layout.jsx             # Menu lateral + topo + área de conteúdo
 │   ├── Sidebar.jsx             # Navegação (vira menu retrátil no mobile)
-│   ├── Modal.jsx / Badge.jsx / CartaoEstatistica.jsx
+│   ├── Infografico.jsx          # Gráficos do dashboard (hora, dia, semana, mês, ano)
+│   ├── Modal.jsx / Badge.jsx / Paginacao.jsx / BotoesCSV.jsx
 ├── pages/
 │   ├── Login.jsx
 │   ├── Dashboard.jsx           # Indicadores + feed de acessos ao vivo
@@ -34,7 +35,8 @@ src/
 │   ├── Dispositivos.jsx
 │   ├── Horarios.jsx
 │   ├── Solicitacoes.jsx        # Aprovar/rejeitar com atualização em tempo real
-│   └── Historico.jsx           # Log de acessos com filtros
+│   ├── Historico.jsx           # Log de acessos com filtros
+│   └── ImportacaoExportacao.jsx # CSV de usuários, cartões, dispositivos e histórico
 ├── styles/global.css           # Tokens de design + regras responsivas
 ├── App.jsx                      # Rotas da aplicação
 └── main.jsx
@@ -57,7 +59,7 @@ Acesse `http://localhost:5173`.
 
 ### Rodando com Docker
 
-Veja o `README-DOCKER.md` na raiz do monorepo.
+Veja a seção "Como rodar (Docker)" no `README.md` da raiz do monorepo.
 
 ## Telas
 

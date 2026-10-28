@@ -71,7 +71,7 @@ API disponível em `http://localhost:3000/api`.
 
 ### Rodando com Docker
 
-Veja o `README-DOCKER.md` na raiz do monorepo — sobe banco, API e painel juntos com `docker compose up -d --build`.
+Veja a seção "Como rodar (Docker)" no `README.md` da raiz — sobe banco, API e painel juntos com `docker compose up -d --build`.
 
 ### Criar o primeiro administrador
 
@@ -126,7 +126,7 @@ A chave é gerada no painel (Dispositivos → botão da chave) ou por `POST /api
 
 ## Exclusão (DELETE)
 
-`usuarios`, `cartoes` e `dispositivos` podem ser excluídos definitivamente. Cartões sempre podem; usuários e dispositivos só quando não têm histórico/vínculos dependentes — nesse caso a API responde `409` com uma mensagem explicando o motivo, em vez de deixar vazar o erro do MySQL.
+`usuarios`, `cartoes` e `dispositivos` só podem ser excluídos quando não têm acessos registrados nem vínculos dependentes. Caso contrário, a API responde `409` com uma mensagem explicando o motivo, e o caminho é bloquear ou desativar (RN08). O histórico de acessos (`acesso`) não pode ser alterado nem excluído: triggers no banco recusam `UPDATE` e `DELETE`.
 
 ## Referência rápida dos endpoints
 
@@ -135,13 +135,18 @@ A chave é gerada no painel (Dispositivos → botão da chave) ou por `POST /api
 | GET | `/api/health` | — |
 | POST | `/api/auth/login` | — |
 | POST | `/api/acesso/validar` | Chave do dispositivo (`X-Dispositivo-Chave`) |
+| POST | `/api/acesso/cartoes-autorizados` | Chave do dispositivo (lista para o modo offline) |
+| POST | `/api/acesso/offline` | Chave do dispositivo (fila de acessos offline) |
 | GET/POST/PUT/PATCH/DELETE | `/api/usuarios` | Bearer |
 | GET/POST/PATCH/DELETE | `/api/cartoes` | Bearer |
 | GET/POST/PUT/PATCH/DELETE | `/api/dispositivos` | Bearer |
 | POST | `/api/dispositivos/:id/chave` | Bearer (master) |
 | GET/POST/DELETE | `/api/horarios` | Bearer |
 | GET/POST/PATCH | `/api/solicitacoes` | Bearer |
-| GET | `/api/acesso` | Bearer |
+| GET | `/api/acesso?pagina=&limite=` | Bearer (sempre paginado) |
+| GET | `/api/relatorios/resumo`, `/por-hora-hoje`, `/por-dia`, `/por-semana`, `/por-mes`, `/por-ano` | Bearer |
+| GET | `/api/csv/{usuarios,cartoes,dispositivos,historico}/exportar` | Bearer (dados pessoais: gestor e master) |
+| POST | `/api/csv/{usuarios,cartoes,dispositivos}/importar` | Bearer (gestor ou master) |
 
 ## WebSocket
 

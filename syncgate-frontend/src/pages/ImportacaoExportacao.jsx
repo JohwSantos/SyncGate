@@ -114,7 +114,7 @@ function SecaoCSV({ titulo, descricao, Icone, rotaExportar, nomeArquivo, rotaImp
   return (
     <div className="sg-card">
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--sg-space-3)' }}>
-        <div style={{ background: 'var(--sg-primary)', color: 'white', padding: '0.5rem', borderRadius: 'var(--sg-radius)', display: 'flex', flexShrink: 0 }}>
+        <div style={{ background: 'var(--sg-brand)', color: 'white', padding: '0.5rem', borderRadius: 'var(--sg-radius)', display: 'flex', flexShrink: 0 }}>
           <Icone size={20} />
         </div>
         <div>

@@ -40,22 +40,21 @@ async function offline(req, res, next) {
   }
 }
 
+// O histórico só sai paginado (padrão: página 1, 15 por página):
+// devolver tudo de uma vez ficaria mais lento a cada dia de uso (RNF06).
 async function listar(req, res, next) {
   try {
-    if (req.query.pagina) {
-      const pagina = Math.max(1, parseInt(req.query.pagina) || 1);
-      const limite = Math.min(100, Math.max(1, parseInt(req.query.limite) || 15));
-      const filtros = {
-        idUsuario: req.query.idUsuario || null,
-        idDispositivo: req.query.idDispositivo || null,
-        status: ['permitido', 'negado'].includes(req.query.status) ? req.query.status : null,
-        dataInicio: req.query.dataInicio || null,
-        dataFim: req.query.dataFim || null,
-      };
-      const { dados, total } = await acessoService.listarPaginado(pagina, limite, filtros);
-      return res.json({ dados, total, pagina, totalPaginas: Math.ceil(total / limite) });
-    }
-    res.json(await acessoService.listar());
+    const pagina = Math.max(1, parseInt(req.query.pagina) || 1);
+    const limite = Math.min(100, Math.max(1, parseInt(req.query.limite) || 15));
+    const filtros = {
+      idUsuario: req.query.idUsuario || null,
+      idDispositivo: req.query.idDispositivo || null,
+      status: ['permitido', 'negado'].includes(req.query.status) ? req.query.status : null,
+      dataInicio: req.query.dataInicio || null,
+      dataFim: req.query.dataFim || null,
+    };
+    const { dados, total } = await acessoService.listarPaginado(pagina, limite, filtros);
+    res.json({ dados, total, pagina, totalPaginas: Math.ceil(total / limite) });
   } catch (erro) {
     next(erro);
   }

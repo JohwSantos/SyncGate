@@ -7,15 +7,6 @@ import api from '../api/client';
 import { useSocket } from '../hooks/useSocket';
 import Infografico from '../components/Infografico';
 
-// Formata "2026-10-08T18:30:00Z" como "18:30"
-function formatarHora(dataHora) {
-  if (!dataHora) return '--';
-  return new Date(dataHora).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function formatarDataHora(dataHora) {
   if (!dataHora) return '--';
   return new Date(dataHora).toLocaleString('pt-BR', {

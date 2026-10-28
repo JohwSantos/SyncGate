@@ -333,10 +333,6 @@ async function registrarOffline(idDispositivo, registros) {
   return { inseridos, duplicados, ignorados };
 }
 
-async function listar() {
-  return acessoModel.listarTodos();
-}
-
 async function listarPaginado(pagina, limite, filtros) {
   return acessoModel.listarPaginado(pagina, limite, filtros);
 }
@@ -353,7 +349,6 @@ module.exports = {
   validarAcesso,
   listarCartoesAutorizados,
   registrarOffline,
-  listar,
   listarPaginado,
   buscarPorId,
 };
