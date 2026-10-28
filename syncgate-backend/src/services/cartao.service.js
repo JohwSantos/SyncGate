@@ -80,7 +80,18 @@ async function definirAtivo(id, ativo) {
 // dispositivo, aqui não esperamos erro de chave estrangeira.
 async function remover(id) {
   await buscarPorId(id); // garante que existe (senão, 404)
-  await cartaoModel.remover(id);
+  try {
+    await cartaoModel.remover(id);
+  } catch (erro) {
+    // RN08: cartão que já foi usado tem histórico e não pode sumir dele.
+    if (erro.errno === 1451 || erro.code === 'ER_ROW_IS_REFERENCED_2') {
+      throw erroComStatus(
+        'Não é possível excluir: este cartão possui histórico de acessos. Desative o cartão em vez de excluir.',
+        409
+      );
+    }
+    throw erro;
+  }
 }
 
 module.exports = {

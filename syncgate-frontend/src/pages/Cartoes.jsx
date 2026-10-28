@@ -226,7 +226,7 @@ export default function Cartoes() {
       <ModalConfirmacao
         aberto={!!cartaoExclusao}
         titulo="Excluir cartao"
-        mensagem={`Tem certeza que deseja excluir o cartao UID "${cartaoExclusao?.uid}"? O historico de acessos feitos com ele nao sera apagado.`}
+        mensagem={`Tem certeza que deseja excluir o cartao UID "${cartaoExclusao?.uid}"? Cartoes que ja foram usados nao podem ser excluidos (o historico e preservado); nesse caso, desative o cartao.`}
         textoConfirmar="Sim, excluir"
         variante="danger"
         carregando={excluindo}

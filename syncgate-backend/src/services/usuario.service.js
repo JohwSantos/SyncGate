@@ -198,7 +198,7 @@ async function remover(id, quemFaz = null) {
   } catch (erro) {
     if (erro.errno === 1451 || erro.code === 'ER_ROW_IS_REFERENCED_2') {
       throw erroComStatus(
-        'Não é possível excluir: este usuário possui cartões ou solicitações vinculadas. ' +
+        'Não é possível excluir: este usuário possui cartões, solicitações ou histórico de acessos. ' +
           'Bloqueie o usuário em vez de excluir, ou remova os cartões vinculados primeiro.',
         409
       );
