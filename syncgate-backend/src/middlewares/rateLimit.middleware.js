@@ -38,7 +38,9 @@ const limitadorLogin = rateLimit({
 // leituras de quem apresentou a chave certa.
 const limitadorDispositivo = rateLimit({
   windowMs: 60 * 1000,
-  limit: 60,
+  // Uma catraca real não passa de 1 leitura por segundo. O teste de
+  // carga (scripts/medir-desempenho.js) sobe este valor via .env.
+  limit: Number(process.env.LIMITE_LEITURAS_POR_MINUTO) || 60,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   keyGenerator: (req) => `dispositivo-${Number(req.body && req.body.id_dispositivo) || ipKeyGenerator(req.ip)}`,
