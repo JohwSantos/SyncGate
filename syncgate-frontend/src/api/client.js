@@ -8,6 +8,12 @@ function pegarToken() {
   return localStorage.getItem('syncgate_token');
 }
 
+function encerrarSessao() {
+  localStorage.removeItem('syncgate_token');
+  localStorage.removeItem('syncgate_usuario');
+  window.location.assign('/login?expirada=1');
+}
+
 async function requisitar(caminho, opcoes = {}) {
   const token = pegarToken();
 
@@ -19,6 +25,12 @@ async function requisitar(caminho, opcoes = {}) {
       ...opcoes.headers,
     },
   });
+
+  // Token expirado ou inválido: limpa a sessão e volta para o login,
+  // em vez de deixar o painel aberto mostrando só erros.
+  if (resposta.status === 401 && token) {
+    encerrarSessao();
+  }
 
   // Respostas 204 (No Content) não têm corpo para converter em JSON
   const dados = resposta.status === 204 ? null : await resposta.json();
@@ -53,6 +65,7 @@ const api = {
       },
       body: formData,
     });
+    if (resposta.status === 401 && token) encerrarSessao();
     const dados = await resposta.json();
     if (!resposta.ok) {
       const erro = new Error(dados?.erro || 'Erro ao enviar arquivo');
@@ -70,6 +83,7 @@ const api = {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
+    if (resposta.status === 401 && token) encerrarSessao();
     if (!resposta.ok) {
       const dados = await resposta.json().catch(() => ({}));
       const erro = new Error(dados?.erro || 'Erro ao baixar arquivo');

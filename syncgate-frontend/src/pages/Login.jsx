@@ -11,7 +11,12 @@ export default function Login() {
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState(null);
+  // Veio de um 401 (token expirado): avisa o motivo de ter voltado ao login.
+  const [erro, setErro] = useState(() =>
+    new URLSearchParams(window.location.search).has('expirada')
+      ? 'Sua sessão expirou. Entre novamente.'
+      : null
+  );
 
   async function aoEnviar(evento) {
     evento.preventDefault();

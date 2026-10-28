@@ -8,6 +8,7 @@ export default function ImportacaoExportacao() {
   const {
     podeGerenciarUsuarios,
     podeGerenciarCartoesDispositivos,
+    podeExportarDadosPessoais,
   } = usePermissoes();
 
   return (
@@ -26,7 +27,7 @@ export default function ImportacaoExportacao() {
           titulo="Usuarios"
           descricao="Cadastro de alunos, professores, funcionarios e administradores."
           Icone={Users}
-          rotaExportar="/csv/usuarios/exportar"
+          rotaExportar={podeExportarDadosPessoais ? '/csv/usuarios/exportar' : null}
           nomeArquivo="usuarios.csv"
           rotaImportar={podeGerenciarUsuarios ? '/csv/usuarios/importar' : null}
           dicaImportacao="Campos obrigatorios: nome, cpf, tipo, login, senha. Linhas com CPF ja cadastrado serao puladas."
@@ -36,7 +37,7 @@ export default function ImportacaoExportacao() {
           titulo="Cartoes RFID"
           descricao="Cartoes vinculados a usuarios. Referencia o dono pelo CPF no CSV."
           Icone={CreditCard}
-          rotaExportar="/csv/cartoes/exportar"
+          rotaExportar={podeExportarDadosPessoais ? '/csv/cartoes/exportar' : null}
           nomeArquivo="cartoes.csv"
           rotaImportar={podeGerenciarCartoesDispositivos ? '/csv/cartoes/importar' : null}
           dicaImportacao="Campos obrigatorios: uid, cpf_usuario. Linhas com UID ja cadastrado serao puladas."
@@ -56,7 +57,7 @@ export default function ImportacaoExportacao() {
           titulo="Historico de Acessos"
           descricao="Log imutavel de todas as tentativas de acesso — somente exportacao."
           Icone={History}
-          rotaExportar="/csv/historico/exportar"
+          rotaExportar={podeExportarDadosPessoais ? '/csv/historico/exportar' : null}
           nomeArquivo="historico-acessos.csv"
           rotaImportar={null}
           dicaImportacao={null}
@@ -72,6 +73,9 @@ function SecaoCSV({ titulo, descricao, Icone, rotaExportar, nomeArquivo, rotaImp
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState(null);
   const inputRef = useRef(null);
+
+  // Sem permissão para exportar nem importar: a seção nem aparece.
+  if (!rotaExportar && !rotaImportar) return null;
 
   async function exportar() {
     setErro(null);
@@ -120,14 +124,16 @@ function SecaoCSV({ titulo, descricao, Icone, rotaExportar, nomeArquivo, rotaImp
       </div>
 
       <div style={{ display: 'flex', gap: 'var(--sg-space-2)', marginTop: 'var(--sg-space-4)', flexWrap: 'wrap' }}>
-        <button
-          className="sg-btn sg-btn-secondary"
-          onClick={exportar}
-          disabled={exportando}
-        >
-          {exportando ? <Spinner tamanho="sm" /> : <Download size={15} />}
-          Exportar CSV
-        </button>
+        {rotaExportar && (
+          <button
+            className="sg-btn sg-btn-secondary"
+            onClick={exportar}
+            disabled={exportando}
+          >
+            {exportando ? <Spinner tamanho="sm" /> : <Download size={15} />}
+            Exportar CSV
+          </button>
+        )}
 
         {rotaImportar && (
           <>

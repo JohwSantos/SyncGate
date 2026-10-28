@@ -13,9 +13,9 @@ if (env.trustProxy > 0) {
   app.set('trust proxy', env.trustProxy);
 }
 
-// Permite que o painel React (rodando em outra porta/origem)
-// consiga fazer requisições para esta API.
-app.use(cors());
+// Só o painel do SyncGate (CORS_ORIGIN) pode chamar a API pelo
+// navegador; outros sites são recusados pelo próprio navegador.
+app.use(cors({ origin: env.corsOrigens }));
 
 // Permite que a API receba e interprete corpos de requisição em JSON
 // (necessário para receber dados em POST/PUT, como cadastro de usuário)

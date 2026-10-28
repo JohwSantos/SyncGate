@@ -20,7 +20,17 @@ module.exports = {
   // Em produção, SEMPRE defina uma chave forte e secreta no .env —
   // o valor abaixo só existe para não quebrar o projeto em
   // ambiente de desenvolvimento se alguém esquecer de configurar.
-  jwtSecret: process.env.JWT_SECRET || 'dev_secret_troque_em_producao',
+  // Sem valor padrão de propósito: um segredo "de exemplo" deixaria
+  // qualquer um forjar tokens. Ver a checagem no fim deste arquivo.
+  jwtSecret: process.env.JWT_SECRET,
+
+  // Origens (endereços do painel) autorizadas a chamar a API pelo
+  // navegador. Várias podem ser separadas por vírgula. O ESP32 não é
+  // navegador e não é afetado por isso.
+  corsOrigens: (process.env.CORS_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origem) => origem.trim())
+    .filter(Boolean),
 
   // Fuso horário do sistema. Controle de acesso depende de "que
   // horas são agora" (regras de horário, relatórios de hoje), então
@@ -46,3 +56,8 @@ module.exports = {
   // que não existe deixaria qualquer um "inventar" o próprio IP.
   trustProxy: Number(process.env.TRUST_PROXY) || 0,
 };
+
+// RNF03: a API não sobe sem um segredo JWT de verdade.
+if (!module.exports.jwtSecret || module.exports.jwtSecret.length < 16) {
+  throw new Error('JWT_SECRET não definido ou curto demais (mínimo 16 caracteres). Configure no .env ou no docker-compose.yml.');
+}

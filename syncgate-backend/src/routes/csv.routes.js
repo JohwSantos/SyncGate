@@ -21,20 +21,22 @@ const upload = multer({
 });
 
 // ---- EXPORTAÇÃO (GET) ----
-// Qualquer perfil autenticado pode exportar (é leitura).
 // O token já é exigido pelo routes/index.js para este grupo.
+// Arquivos com dados pessoais (nome, CPF, contato, passagens) só
+// saem para gestor e master (RNF03 / LGPD). Dispositivos: qualquer perfil.
+const exportaDadosPessoais = permitirPerfil('gestor', 'master');
 
 // GET /api/csv/usuarios/exportar
-router.get('/usuarios/exportar', csvController.exportarUsuarios);
+router.get('/usuarios/exportar', exportaDadosPessoais, csvController.exportarUsuarios);
 
 // GET /api/csv/cartoes/exportar
-router.get('/cartoes/exportar', csvController.exportarCartoes);
+router.get('/cartoes/exportar', exportaDadosPessoais, csvController.exportarCartoes);
 
 // GET /api/csv/dispositivos/exportar
 router.get('/dispositivos/exportar', csvController.exportarDispositivos);
 
 // GET /api/csv/historico/exportar
-router.get('/historico/exportar', csvController.exportarHistorico);
+router.get('/historico/exportar', exportaDadosPessoais, csvController.exportarHistorico);
 
 
 // ---- IMPORTAÇÃO (POST) ----

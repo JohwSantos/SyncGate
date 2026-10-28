@@ -9,7 +9,7 @@ let io = null;
 
 function inicializar(servidorHttp) {
   io = new Server(servidorHttp, {
-    cors: { origin: '*' }, // o painel React roda em outra porta/origem
+    cors: { origin: env.corsOrigens }, // mesmas origens liberadas na API
   });
 
   // Mesma ideia do middleware verificarToken das rotas REST: só

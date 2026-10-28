@@ -9,7 +9,9 @@ function errorHandler(err, req, res, next) {
   console.error(err);
 
   const status = err.status || 500;
-  const message = err.message || 'Erro interno do servidor';
+  // Erro 500 é inesperado (banco, bug...): a mensagem original pode
+  // revelar detalhes internos, então ela fica só no log do servidor.
+  const message = status >= 500 ? 'Erro interno do servidor' : err.message;
 
   res.status(status).json({
     erro: message,
