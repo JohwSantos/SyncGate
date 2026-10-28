@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import api from '../api/client';
 import { useSocket } from '../hooks/useSocket';
+import Infografico from '../components/Infografico';
 
 // Formata "2026-10-08T18:30:00Z" como "18:30"
 function formatarHora(dataHora) {
@@ -23,14 +24,28 @@ function formatarDataHora(dataHora) {
   });
 }
 
+// Relatórios do resumo por período. Os números contam o período
+// atual + os anteriores: hoje + 6 dias, esta semana + 7, este mês + 11.
+async function buscarPeriodos() {
+  const [dia, semana, mes, ano] = await Promise.all([
+    api.get('/relatorios/por-dia?dias=6'),
+    api.get('/relatorios/por-semana?semanas=7'),
+    api.get('/relatorios/por-mes?meses=11'),
+    api.get('/relatorios/por-ano'),
+  ]);
+  return { dia, semana, mes, ano };
+}
+
 export default function Dashboard() {
   const [resumo, setResumo] = useState(null);
+  const [porHora, setPorHora] = useState([]);
+  const [porPeriodo, setPorPeriodo] = useState({});
   const [acessosRecentes, setAcessosRecentes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
 
-  // Recarrega só os números dos cards (sem o "Carregando..." da
+  // Recarrega os números dos cards e do infográfico (sem o "Carregando..." da
   // tela toda). Se chegarem vários eventos seguidos, espera 400 ms
   // e faz UMA requisição só, em vez de uma por evento.
   const temporizadorResumo = useRef(null);
@@ -38,7 +53,14 @@ export default function Dashboard() {
     clearTimeout(temporizadorResumo.current);
     temporizadorResumo.current = setTimeout(async () => {
       try {
-        setResumo(await api.get('/relatorios/resumo'));
+        const [r, h, periodos] = await Promise.all([
+          api.get('/relatorios/resumo'),
+          api.get('/relatorios/por-hora-hoje'),
+          buscarPeriodos(),
+        ]);
+        setResumo(r);
+        setPorHora(h);
+        setPorPeriodo(periodos);
       } catch {
         // Falhou uma atualização em segundo plano: mantém os números
         // atuais; a próxima atualização tenta de novo.
@@ -74,12 +96,16 @@ export default function Dashboard() {
     try {
       setCarregando(true);
       setErro(null);
-      const [resumoResp, acessosResp, usuariosResp] = await Promise.all([
+      const [resumoResp, acessosResp, usuariosResp, horaResp, periodosResp] = await Promise.all([
         api.get('/relatorios/resumo'),
         api.get('/acesso?limite=15&pagina=1'),
         api.get('/usuarios'),
+        api.get('/relatorios/por-hora-hoje'),
+        buscarPeriodos(),
       ]);
       setResumo(resumoResp);
+      setPorHora(horaResp ?? []);
+      setPorPeriodo(periodosResp);
       setAcessosRecentes(acessosResp.dados ?? []);
       setUsuarios(usuariosResp ?? []);
     } catch (e) {
@@ -166,6 +192,8 @@ export default function Dashboard() {
           </span>
         </div>
       )}
+
+      <Infografico resumo={resumo} porHora={porHora} porPeriodo={porPeriodo} />
 
       {/* Feed de ultimos acessos */}
       <div className="sg-card">

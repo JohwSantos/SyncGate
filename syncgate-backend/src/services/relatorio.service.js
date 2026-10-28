@@ -21,26 +21,28 @@ async function acessosPorDia(dias = 30) {
   return linhas;
 }
 
-// Agrupa acessos por semana (últimas 12 semanas).
-// Retorna: [{ ano, semana, inicio_semana, permitidos, negados, total }]
+// Agrupa acessos por semana (segunda a domingo): a semana atual e
+// as `semanas` anteriores, completas.
+// Retorna: [{ inicio_semana, permitidos, negados, total }]
 async function acessosPorSemana(semanas = 12) {
   const [linhas] = await pool.query(`
     SELECT
-      YEAR(data_hora)            AS ano,
-      WEEK(data_hora, 1)         AS semana,
       DATE(DATE_SUB(data_hora, INTERVAL WEEKDAY(data_hora) DAY)) AS inicio_semana,
       SUM(status = 'permitido')  AS permitidos,
       SUM(status = 'negado')     AS negados,
       COUNT(*)                   AS total
     FROM acesso
-    WHERE data_hora >= DATE_SUB(CURDATE(), INTERVAL ? WEEK)
-    GROUP BY ano, semana, inicio_semana
-    ORDER BY ano ASC, semana ASC
+    -- Começa numa segunda-feira, para a primeira semana vir completa.
+    -- Agrupar só pela segunda-feira (e não por ano + número da semana)
+    -- evita partir em duas a semana que atravessa a virada do ano.
+    WHERE data_hora >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL ? WEEK)
+    GROUP BY inicio_semana
+    ORDER BY inicio_semana ASC
   `, [semanas]);
   return linhas;
 }
 
-// Agrupa acessos por mês (últimos 12 meses).
+// Agrupa acessos por mês: o mês atual e os `meses` anteriores, completos.
 // Retorna: [{ ano, mes, permitidos, negados, total }]
 async function acessosPorMes(meses = 12) {
   const [linhas] = await pool.query(`
@@ -51,7 +53,8 @@ async function acessosPorMes(meses = 12) {
       SUM(status = 'negado')     AS negados,
       COUNT(*)                   AS total
     FROM acesso
-    WHERE data_hora >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+    -- Começa no dia 1º, para o primeiro mês vir completo.
+    WHERE data_hora >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL ? MONTH)
     GROUP BY ano, mes
     ORDER BY ano ASC, mes ASC
   `, [meses]);
