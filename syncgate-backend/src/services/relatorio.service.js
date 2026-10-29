@@ -109,14 +109,17 @@ async function resumoGeral() {
     LIMIT 1
   `);
 
-  // Top 5 motivos de negação (útil para análise).
+  // Top 5 motivos de negação (útil para análise). O motivo de cartão
+  // desconhecido traz o UID ("UID não cadastrado: A1B2C3D4"); aqui todos
+  // contam juntos, senão cada cartão diferente vira uma linha.
   const [motivosNegacao] = await pool.query(`
     SELECT
-      motivo_negado AS motivo,
-      COUNT(*)      AS total
+      CASE WHEN motivo_negado LIKE 'UID não cadastrado%' THEN 'UID não cadastrado'
+           ELSE motivo_negado END AS motivo,
+      COUNT(*) AS total
     FROM acesso
     WHERE status = 'negado' AND motivo_negado IS NOT NULL
-    GROUP BY motivo_negado
+    GROUP BY 1
     ORDER BY total DESC
     LIMIT 5
   `);

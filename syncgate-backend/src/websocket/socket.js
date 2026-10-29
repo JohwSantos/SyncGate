@@ -1,6 +1,6 @@
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
 const env = require('../config/env');
+const { usuarioDoToken } = require('../middlewares/auth.middleware');
 
 // Guardamos a instância do socket.io aqui, num módulo separado,
 // para que qualquer service consiga emitir eventos (via emitir())
@@ -16,7 +16,7 @@ function inicializar(servidorHttp) {
   // quem apresentar um token JWT válido consegue estabelecer a
   // conexão WebSocket. O token é enviado pelo cliente em
   // `socket.handshake.auth.token` (não como parte da URL).
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth && socket.handshake.auth.token;
 
     if (!token) {
@@ -24,11 +24,12 @@ function inicializar(servidorHttp) {
     }
 
     try {
-      socket.usuarioLogado = jwt.verify(token, env.jwtSecret);
-      next();
+      socket.usuarioLogado = await usuarioDoToken(token);
     } catch (erro) {
-      next(new Error('Token inválido ou expirado'));
+      return next(new Error('Token inválido ou expirado'));
     }
+    if (!socket.usuarioLogado) return next(new Error('Usuário bloqueado ou sem acesso ao painel'));
+    next();
   });
 
   io.on('connection', (socket) => {
