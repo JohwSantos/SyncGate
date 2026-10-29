@@ -112,8 +112,12 @@ const unsigned long INTERVALO_RECONEXAO_MS = 5000;
 
 // Tempo máximo para abrir a conexão com a API. Curto de propósito:
 // se o servidor não responder, o leitor passa a decidir offline
-// sem deixar a pessoa esperando na catraca.
-const int TIMEOUT_CONEXAO_MS = 2500;
+// sem deixar a pessoa esperando na catraca (RNF01: até 2 s).
+const int TIMEOUT_CONEXAO_MS = 1500;
+
+// Depois de uma falha de conexão, o leitor decide offline na hora
+// durante este tempo, sem esperar a API a cada cartão.
+const unsigned long PAUSA_APOS_FALHA_MS = 30UL * 1000;
 
 // Modo offline: de quanto em quanto tempo atualizar a lista de
 // cartões e tentar enviar a fila de acessos guardados.
@@ -154,6 +158,7 @@ unsigned long momentoUltimaVerificacaoWifi = 0;
 JsonDocument listaCartoes;
 unsigned long momentoUltimaLista = 0;
 unsigned long momentoUltimoEnvioFila = 0;
+unsigned long momentoFalhaApi = 0; // 0 = a última conexão deu certo
 
 
 // ============================================================
@@ -267,9 +272,12 @@ bool configuracaoFoiSalva = false;
 // Nome da rede de configuração: "SyncGate-" + final do MAC da placa,
 // para dar para diferenciar várias catracas no mesmo lugar.
 String nomeRedeConfiguracao() {
-  String mac = WiFi.macAddress(); // "AA:BB:CC:DD:EE:FF"
-  mac.replace(":", "");
-  return "SyncGate-" + mac.substring(8);
+  // MAC gravado de fábrica no chip: WiFi.macAddress() devolve zeros
+  // antes de o Wi-Fi iniciar (dava "SyncGate-0000").
+  uint64_t mac = ESP.getEfuseMac();
+  char final[5];
+  snprintf(final, sizeof(final), "%02X%02X", (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+  return "SyncGate-" + String(final);
 }
 
 // Conecta no Wi-Fi salvo. Se não houver Wi-Fi salvo, se não
@@ -298,7 +306,10 @@ void conectarWifi() {
   gerenciador.setConnectTimeout(20);
   // Já configurado (só o Wi-Fi está fora): a página fica aberta por
   // menos tempo, e depois a catraca segue funcionando offline.
-  gerenciador.setConfigPortalTimeout(configuracaoCompleta() ? 60 : TEMPO_PORTAL_S);
+  // Com Wi-Fi salvo (só a rede caiu), a página fica aberta 1 minuto e
+  // depois a catraca segue offline. Sem Wi-Fi salvo, espera o tempo todo.
+  bool wifiSalvo = gerenciador.getWiFiIsSaved();
+  gerenciador.setConfigPortalTimeout(configuracaoCompleta() && wifiSalvo ? 60 : TEMPO_PORTAL_S);
 
   String nomeRede = nomeRedeConfiguracao();
 
@@ -352,6 +363,13 @@ void conectarWifi() {
     // Ninguém configurou a tempo ou ainda falta algum campo:
     // reinicia e tenta de novo do começo.
     Serial.println("[WiFi] Configuracao incompleta. Reiniciando em 3 s...");
+    delay(3000);
+    ESP.restart();
+  }
+
+  if (!conectado && !wifiSalvo) {
+    // Ninguém configurou o Wi-Fi: reinicia para abrir a página de novo.
+    Serial.println("[WiFi] Nenhum Wi-Fi configurado. Reiniciando em 3 s...");
     delay(3000);
     ESP.restart();
   }
@@ -481,6 +499,8 @@ int postarJson(const String &url, const String &corpo, String &resposta) {
 
   int codigo = http.POST(corpo);
   resposta = codigo > 0 ? http.getString() : "";
+  // Guarda quando a API deixou de responder (| 1 evita o valor 0).
+  momentoFalhaApi = codigo > 0 ? 0 : (millis() | 1);
   http.end();
   return codigo;
 }
@@ -493,9 +513,18 @@ String urlDaRota(const char *rota) {
   return apiUrl.substring(0, fim + 1) + rota;
 }
 
+// A API falhou há menos de PAUSA_APOS_FALHA_MS?
+bool apiForaDoAr() {
+  return momentoFalhaApi != 0 && millis() - momentoFalhaApi < PAUSA_APOS_FALHA_MS;
+}
+
 Resultado validarNaApi(const String &uid) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[API] Sem Wi-Fi.");
+    return SEM_CONEXAO;
+  }
+  if (apiForaDoAr()) {
+    Serial.println("[API] Fora do ar ha pouco; decidindo offline sem esperar.");
     return SEM_CONEXAO;
   }
 
@@ -762,8 +791,9 @@ void loop() {
   verificarBotaoReset();
   manterWifi();
 
-  // Tarefas do modo offline, só com Wi-Fi.
-  if (WiFi.status() == WL_CONNECTED) {
+  // Tarefas do modo offline, só com Wi-Fi e API respondendo
+  // (com a API fora, cada tentativa travaria a leitura por 1,5 s).
+  if (WiFi.status() == WL_CONNECTED && !apiForaDoAr()) {
     if (millis() - momentoUltimaLista >= INTERVALO_LISTA_MS) atualizarLista();
     if (millis() - momentoUltimoEnvioFila >= INTERVALO_FILA_MS) enviarFila();
   }
