@@ -1,0 +1,83 @@
+# SyncGate em produção (máquina virtual Ubuntu na Azure)
+#
+# Diferenças em relação ao docker-compose.yml do PC:
+#   - Um só endereço com HTTPS: o Caddy recebe tudo nas portas 80/443
+#     e encaminha /api e /socket.io para a API e o resto para o painel.
+#   - Banco, API e painel NÃO ficam expostos para a internet.
+#   - Senhas e segredo vêm do arquivo .env (fora do Git).
+#
+# Uso (dentro da pasta deploy/, com o .env preenchido):
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Passo a passo completo: deploy/README.md
+
+services:
+  mysql:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no .env}
+      MYSQL_DATABASE: syncgate
+      MYSQL_USER: syncgate_app
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env}
+      TZ: America/Sao_Paulo
+    volumes:
+      - syncgate_dados:/var/lib/mysql
+      - ../syncgate-backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build: ../syncgate-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: syncgate_app
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: syncgate
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env}
+      APP_TIMEZONE: America/Sao_Paulo
+      DB_TIMEZONE: "-03:00"
+      # O Caddy fica na frente da API: confia em 1 proxy para ler o IP real.
+      TRUST_PROXY: 1
+      CORS_ORIGIN: https://${DOMINIO:?Defina DOMINIO no .env}
+      TZ: America/Sao_Paulo
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../syncgate-frontend
+      args:
+        # O painel é montado já apontando para o endereço público.
+        VITE_API_URL: https://${DOMINIO}/api
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dados:/data # certificado HTTPS (não apagar)
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  syncgate_dados:
+  caddy_dados:
+  caddy_config:

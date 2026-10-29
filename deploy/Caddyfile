@@ -1,0 +1,18 @@
+# Caddy: recebe o tráfego da internet e emite o certificado HTTPS
+# sozinho (Let's Encrypt) para o domínio definido em DOMINIO no .env.
+{$DOMINIO} {
+	encode gzip
+
+	# API REST e WebSocket (painel em tempo real) vão para o backend
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+	handle /socket.io/* {
+		reverse_proxy backend:3000
+	}
+
+	# Todo o resto é o painel React
+	handle {
+		reverse_proxy frontend:80
+	}
+}
