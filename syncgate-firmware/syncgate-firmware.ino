@@ -472,10 +472,18 @@ bool leitorRespondendo() {
 // que confere o certificado do servidor contra os certificados
 // raiz de certificados.h. Se o servidor não for quem diz ser, a
 // conexão falha — os dados nunca chegam a um impostor.
+// Conexão mantida aberta entre uma leitura e outra (keep-alive): a
+// negociação HTTPS custa cerca de 3 s no ESP32, então ela é feita uma
+// vez e reaproveitada. Se o servidor fechar, o HTTPClient reconecta.
+WiFiClient clienteComum;
+WiFiClientSecure clienteSeguro;
+HTTPClient http;
+
 int postarJson(const String &url, const String &corpo, String &resposta) {
-  WiFiClient clienteComum;
-  WiFiClientSecure clienteSeguro;
-  HTTPClient http;
+  // Conexão que vinha de uma leitura anterior? (o servidor pode tê-la
+  // fechado por inatividade; nesse caso, tenta de novo do zero abaixo)
+  bool reaproveitada = clienteSeguro.connected() || clienteComum.connected();
+  http.setReuse(true);
   http.setConnectTimeout(TIMEOUT_CONEXAO_MS);
   http.setTimeout(TIMEOUT_API_MS);
 
@@ -498,10 +506,19 @@ int postarJson(const String &url, const String &corpo, String &resposta) {
   http.addHeader("X-Dispositivo-Chave", chaveDispositivo);
 
   int codigo = http.POST(corpo);
+  if (codigo <= 0 && reaproveitada) {
+    http.end();
+    clienteSeguro.stop();
+    clienteComum.stop();
+    return postarJson(url, corpo, resposta); // agora com conexão nova
+  }
   resposta = codigo > 0 ? http.getString() : "";
   // Guarda quando a API deixou de responder (| 1 evita o valor 0).
   momentoFalhaApi = codigo > 0 ? 0 : (millis() | 1);
+  // Com setReuse, end() mantém a conexão aberta se tudo deu certo;
+  // depois de uma falha, fecha de vez para a próxima tentar do zero.
   http.end();
+  if (codigo <= 0) { clienteSeguro.stop(); clienteComum.stop(); }
   return codigo;
 }
 
