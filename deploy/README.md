@@ -1,7 +1,7 @@
 # SyncGate na máquina virtual da Azure (Ubuntu + Docker)
 
 Resultado: o painel e a API num endereço só, com HTTPS, por exemplo
-`https://syncgate-etec.brazilsouth.cloudapp.azure.com`. O ESP32 passa
+`https://syncgate-etec.chilecentral.cloudapp.azure.com`. O ESP32 passa
 a usar esse endereço e funciona de qualquer rede com internet.
 
 ## 1. No portal da Azure (uma vez)
@@ -9,7 +9,7 @@ a usar esse endereço e funciona de qualquer rede com internet.
 1. **Nome DNS:** abra a máquina virtual › **Endereço IP público** ›
    **Configuração** › **Rótulo de nome DNS**, digite um nome (ex.:
    `syncgate-etec`) e salve. O endereço completo aparece logo abaixo
-   (ex.: `syncgate-etec.brazilsouth.cloudapp.azure.com`).
+   (ex.: `syncgate-etec.chilecentral.cloudapp.azure.com`).
    Se o IP for **dinâmico**, troque para **estático** na mesma tela.
 2. **Firewall (Rede › Regras de porta de entrada):** permita as portas
    **80** e **443** (TCP, origem: qualquer). Mantenha a 22 (SSH).
