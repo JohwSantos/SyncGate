@@ -762,9 +762,24 @@ input, select, textarea {
   .sg-btn-menu { display: flex; }
   .sg-main { padding: var(--sg-space-4); }
   .sg-login-pagina { grid-template-columns: 1fr !important; }
-  .sg-login-marca  { display: none; }
+  .sg-login-marca  { display: none !important; } /* o painel usa display inline */
   .sg-form-row { grid-template-columns: 1fr; }
-  .sg-page-header { flex-direction: column; align-items: flex-start; }
+  .sg-page-header { flex-direction: column; align-items: stretch; }
+  .sg-page-actions { flex-wrap: wrap; }
+  .sg-page-actions > .sg-btn { flex: 1 1 auto; }
+  .sg-search { min-width: 0; width: 100%; height: 40px; }
+
+  /* Cabeçalho: o título da página já aparece abaixo; aqui só cabe o essencial */
+  .sg-header { padding: 0 var(--sg-space-3); gap: var(--sg-space-2); }
+  .sg-header-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sg-header-actions { gap: var(--sg-space-2); }
+  .sg-user-info, .sg-header-sep { display: none; }
+
+  /* Alvos de toque de pelo menos 40 px */
+  .sg-btn-icon, .sg-btn-theme, .sg-btn-logout { width: 40px; height: 40px; }
+  .sg-page-btn { min-width: 38px; height: 38px; }
+  .sg-pagination, .sg-pagination-controls { flex-wrap: wrap; }
+  .sg-btn { min-height: 40px; }
 
   /* Tabela responsiva */
   .sg-table-responsive thead { display: none; }
@@ -780,6 +795,7 @@ input, select, textarea {
   }
   .sg-table-responsive td {
     display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere;
     gap: var(--sg-space-3);
     padding: var(--sg-space-2) 0 !important;
     border-bottom: 1px solid var(--sg-border) !important;

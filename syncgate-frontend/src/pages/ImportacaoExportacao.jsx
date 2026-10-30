@@ -22,7 +22,7 @@ export default function ImportacaoExportacao() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 'var(--sg-space-4)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 380px), 1fr))', gap: 'var(--sg-space-4)' }}>
         <SecaoCSV
           titulo="Usuarios"
           descricao="Cadastro de alunos, professores, funcionarios e administradores."
